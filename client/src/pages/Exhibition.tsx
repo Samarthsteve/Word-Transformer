@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import type { GeneratedToken, GenerateResponse } from "@shared/schema";
+import type { GeneratedToken, GenerateResponse, RegenerateRequest } from "@shared/schema";
 
 import { ModelSelector } from "@/components/ModelSelector";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -13,7 +13,7 @@ import { Controls } from "@/components/Controls";
 import { EducationalAnnotation } from "@/components/EducationalAnnotation";
 import { TransformerFeedback } from "@/components/TransformerFeedback";
 
-type AnnotationState = "idle" | "generating" | "revealing" | "showing-probabilities" | "complete";
+type AnnotationState = "idle" | "generating" | "revealing" | "showing-probabilities" | "complete" | "regenerating";
 
 export default function Exhibition() {
   const [selectedModel, setSelectedModel] = useState<"gemini" | "openai">("gemini");
@@ -47,6 +47,35 @@ export default function Exhibition() {
     onError: (error) => {
       console.error("Generation error:", error);
       setAnnotationState("idle");
+    },
+  });
+
+  const regenerateMutation = useMutation({
+    mutationFn: async (data: RegenerateRequest) => {
+      const response = await apiRequest("POST", "/api/regenerate", data);
+      const jsonData = await response.json();
+      return jsonData as GenerateResponse;
+    },
+    onSuccess: (data, variables) => {
+      const validTokens = Array.isArray(data?.tokens) ? data.tokens : [];
+      if (validTokens.length === 0) {
+        console.warn("No tokens received from regenerate API");
+        setAnnotationState("showing-probabilities");
+        return;
+      }
+      const tokensBeforeIndex = tokens.slice(0, currentIndex);
+      const newTokenWithAlternatives: GeneratedToken = {
+        token: variables.newToken,
+        alternatives: tokens[currentIndex]?.alternatives || [],
+      };
+      const newTokenList = [...tokensBeforeIndex, newTokenWithAlternatives, ...validTokens];
+      setTokens(newTokenList);
+      setShowProbabilities(true);
+      setAnnotationState("showing-probabilities");
+    },
+    onError: (error) => {
+      console.error("Regeneration error:", error);
+      setAnnotationState("showing-probabilities");
     },
   });
 
@@ -102,7 +131,24 @@ export default function Exhibition() {
     setPrompt("");
     setAnnotationState("idle");
     generateMutation.reset();
-  }, [generateMutation]);
+    regenerateMutation.reset();
+  }, [generateMutation, regenerateMutation]);
+
+  const handleAlternativeClick = useCallback((alternativeToken: string) => {
+    if (currentIndex < 0 || regenerateMutation.isPending || generateMutation.isPending) return;
+    
+    const tokensBeforeChange = tokens.slice(0, currentIndex).map(t => t.token);
+    
+    setAnnotationState("regenerating");
+    setShowProbabilities(false);
+    
+    regenerateMutation.mutate({
+      originalPrompt: prompt,
+      tokensBeforeChange,
+      newToken: alternativeToken,
+      model: selectedModel,
+    });
+  }, [currentIndex, tokens, prompt, selectedModel, regenerateMutation, generateMutation]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -125,11 +171,12 @@ export default function Exhibition() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [tokens.length, currentIndex, generateMutation.isPending, handleNext, handleReset, handleFastForward]);
 
-  const isGenerating = generateMutation.isPending;
+  const isGenerating = generateMutation.isPending || regenerateMutation.isPending;
   const hasTokens = tokens.length > 0;
   const canNext = hasTokens && currentIndex < tokens.length - 1 && !isGenerating;
   const canFastForward = hasTokens && currentIndex < tokens.length - 1 && !isGenerating;
   const isComplete = hasTokens && currentIndex === tokens.length - 1;
+  const isRegenerating = regenerateMutation.isPending;
 
   const currentToken = currentIndex >= 0 && currentIndex < tokens.length ? tokens[currentIndex] : null;
 
@@ -199,6 +246,8 @@ export default function Exhibition() {
               alternatives={currentToken.alternatives}
               currentToken={currentToken.token}
               isVisible={showProbabilities}
+              onAlternativeClick={handleAlternativeClick}
+              isRegenerating={isRegenerating}
             />
           )}
 

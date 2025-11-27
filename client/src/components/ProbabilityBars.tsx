@@ -1,4 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
+import { RefreshCw } from "lucide-react";
 import type { TokenProbability } from "@shared/schema";
 
 type ProbabilityBarsProps = {
@@ -6,9 +7,10 @@ type ProbabilityBarsProps = {
   currentToken: string;
   isVisible: boolean;
   onAlternativeClick?: (token: string) => void;
+  isRegenerating?: boolean;
 };
 
-export function ProbabilityBars({ alternatives, currentToken, isVisible, onAlternativeClick }: ProbabilityBarsProps) {
+export function ProbabilityBars({ alternatives, currentToken, isVisible, onAlternativeClick, isRegenerating }: ProbabilityBarsProps) {
   const allTokens = [
     { token: currentToken, probability: alternatives.length > 0 ? Math.max(...alternatives.map(a => a.probability)) + 0.1 : 0.9 },
     ...alternatives,
@@ -26,8 +28,16 @@ export function ProbabilityBars({ alternatives, currentToken, isVisible, onAlter
           transition={{ duration: 0.4 }}
           className="w-full max-w-2xl mx-auto space-y-3"
         >
-          <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-4">
-            Probability Distribution
+          <div className="flex items-center justify-between mb-4">
+            <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
+              Probability Distribution
+            </div>
+            {onAlternativeClick && (
+              <div className="text-xs text-muted-foreground flex items-center gap-1">
+                <RefreshCw className="w-3 h-3" />
+                Click alternative to regenerate
+              </div>
+            )}
           </div>
           {allTokens.map((item, index) => {
             const isChosen = item.token === currentToken;
@@ -35,27 +45,41 @@ export function ProbabilityBars({ alternatives, currentToken, isVisible, onAlter
             const displayPercentage = (item.probability * 100).toFixed(1);
 
             const isAlternative = !isChosen && item.token !== currentToken;
+            const isClickable = isAlternative && onAlternativeClick && !isRegenerating;
             return (
               <motion.div
                 key={`${item.token}-${index}`}
                 initial={{ opacity: 0, x: -30 }}
                 animate={{ opacity: 1, x: 0 }}
+                whileHover={isClickable ? { scale: 1.01, x: 4 } : {}}
                 transition={{ 
                   delay: index * 0.08,
                   duration: 0.5,
                   ease: [0.25, 0.46, 0.45, 0.94]
                 }}
-                className="flex items-center gap-4"
-                onClick={() => isAlternative && onAlternativeClick?.(item.token)}
+                className={`flex items-center gap-4 rounded-lg transition-colors ${
+                  isClickable 
+                    ? "cursor-pointer hover:bg-muted/50 p-2 -mx-2" 
+                    : isRegenerating 
+                    ? "opacity-50 cursor-wait p-2 -mx-2" 
+                    : "p-2 -mx-2"
+                }`}
+                onClick={() => isClickable && onAlternativeClick(item.token)}
+                data-testid={`bar-row-${index}`}
               >
                 <div className="w-24 text-right shrink-0">
-                  <motion.button
-                    whileHover={isAlternative ? { scale: 1.05 } : {}}
-                    className={`font-mono text-sm cursor-pointer transition-colors ${isChosen ? "text-primary font-bold" : isAlternative ? "text-foreground/70 hover:text-foreground" : "text-foreground/70"}`}
+                  <motion.span
+                    className={`font-mono text-sm transition-colors ${
+                      isChosen 
+                        ? "text-primary font-bold" 
+                        : isClickable 
+                        ? "text-foreground/70 hover:text-foreground" 
+                        : "text-foreground/70"
+                    }`}
                     data-testid={`text-token-${index}`}
                   >
                     "{item.token}"
-                  </motion.button>
+                  </motion.span>
                 </div>
                 
                 <div className="flex-1 h-10 bg-muted/30 rounded-lg overflow-hidden relative">
