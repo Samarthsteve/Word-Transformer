@@ -11,6 +11,7 @@ import { TokenDisplay } from "@/components/TokenDisplay";
 import { ProbabilityBars } from "@/components/ProbabilityBars";
 import { Controls } from "@/components/Controls";
 import { EducationalAnnotation } from "@/components/EducationalAnnotation";
+import { TransformerFeedback } from "@/components/TransformerFeedback";
 
 type AnnotationState = "idle" | "generating" | "revealing" | "showing-probabilities" | "complete";
 
@@ -21,6 +22,8 @@ export default function Exhibition() {
   const [currentIndex, setCurrentIndex] = useState(-1);
   const [showProbabilities, setShowProbabilities] = useState(false);
   const [annotationState, setAnnotationState] = useState<AnnotationState>("idle");
+  const [selectedAlternative, setSelectedAlternative] = useState<string | null>(null);
+  const [showTransformer, setShowTransformer] = useState(false);
   const fastForwardRef = useRef(false);
 
   const generateMutation = useMutation({
