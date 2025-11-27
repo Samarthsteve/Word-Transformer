@@ -5,9 +5,10 @@ type ProbabilityBarsProps = {
   alternatives: TokenProbability[];
   currentToken: string;
   isVisible: boolean;
+  onAlternativeClick?: (token: string) => void;
 };
 
-export function ProbabilityBars({ alternatives, currentToken, isVisible }: ProbabilityBarsProps) {
+export function ProbabilityBars({ alternatives, currentToken, isVisible, onAlternativeClick }: ProbabilityBarsProps) {
   const allTokens = [
     { token: currentToken, probability: alternatives.length > 0 ? Math.max(...alternatives.map(a => a.probability)) + 0.1 : 0.9 },
     ...alternatives,
@@ -33,6 +34,7 @@ export function ProbabilityBars({ alternatives, currentToken, isVisible }: Proba
             const barWidth = (item.probability / maxProbability) * 100;
             const displayPercentage = (item.probability * 100).toFixed(1);
 
+            const isAlternative = !isChosen && item.token !== currentToken;
             return (
               <motion.div
                 key={`${item.token}-${index}`}
@@ -44,14 +46,16 @@ export function ProbabilityBars({ alternatives, currentToken, isVisible }: Proba
                   ease: [0.25, 0.46, 0.45, 0.94]
                 }}
                 className="flex items-center gap-4"
+                onClick={() => isAlternative && onAlternativeClick?.(item.token)}
               >
                 <div className="w-24 text-right shrink-0">
-                  <span 
-                    className={`font-mono text-sm ${isChosen ? "text-primary font-bold" : "text-foreground/70"}`}
+                  <motion.button
+                    whileHover={isAlternative ? { scale: 1.05 } : {}}
+                    className={`font-mono text-sm cursor-pointer transition-colors ${isChosen ? "text-primary font-bold" : isAlternative ? "text-foreground/70 hover:text-foreground" : "text-foreground/70"}`}
                     data-testid={`text-token-${index}`}
                   >
                     "{item.token}"
-                  </span>
+                  </motion.button>
                 </div>
                 
                 <div className="flex-1 h-10 bg-muted/30 rounded-lg overflow-hidden relative">
