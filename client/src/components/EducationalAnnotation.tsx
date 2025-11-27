@@ -1,7 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { Info } from "lucide-react";
 
-type AnnotationState = "idle" | "generating" | "revealing" | "showing-probabilities" | "complete";
+type AnnotationState = "idle" | "generating" | "revealing" | "showing-probabilities" | "complete" | "regenerating";
 
 type EducationalAnnotationProps = {
   state: AnnotationState;
@@ -29,6 +29,10 @@ const annotations: Record<AnnotationState, { title: string; description: string 
   complete: {
     title: "Generation Complete",
     description: "The model has finished generating. Each token was chosen from thousands of possibilities, creating a coherent response.",
+  },
+  regenerating: {
+    title: "Regenerating Response",
+    description: "You selected an alternative token! The model is now generating a new continuation based on your choice.",
   },
 };
 
