@@ -32,6 +32,16 @@ export const generateResponseSchema = z.object({
 
 export type GenerateResponse = z.infer<typeof generateResponseSchema>;
 
+// Regenerate request - for when user clicks an alternative token
+export const regenerateRequestSchema = z.object({
+  originalPrompt: z.string().min(1),
+  tokensBeforeChange: z.array(z.string()),
+  newToken: z.string(),
+  model: z.enum(["gemini", "openai"]),
+});
+
+export type RegenerateRequest = z.infer<typeof regenerateRequestSchema>;
+
 // Preset prompts for exhibition
 export const presetPrompts = [
   "Once upon a time, in a land far away",

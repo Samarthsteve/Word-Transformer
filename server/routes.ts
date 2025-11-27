@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { GoogleGenAI } from "@google/genai";
 import OpenAI from "openai";
-import { generateRequestSchema, type GeneratedToken } from "@shared/schema";
+import { generateRequestSchema, regenerateRequestSchema, type GeneratedToken } from "@shared/schema";
 
 const gemini = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 
@@ -11,22 +11,52 @@ const openai = process.env.OPENAI_API_KEY
   : null;
 
 async function generateWithGemini(prompt: string): Promise<GeneratedToken[]> {
-  const systemPrompt = `You are a helpful assistant that generates thoughtful responses. 
-Generate a response to the user's prompt. Keep the response concise but meaningful (10-20 words).
-Return your response as plain text only.`;
+  const systemPrompt = `You are a text completion engine. Your ONLY job is to continue the text that the user provides.
+
+CRITICAL RULES:
+1. Do NOT repeat any part of the user's text
+2. Do NOT add quotation marks, commentary, or explanations
+3. Simply continue writing from exactly where the user left off
+4. Generate 8-15 additional words that naturally continue the text
+5. Return ONLY the continuation, nothing else
+
+Example:
+User: "The quick brown fox"
+You: "jumps over the lazy dog sleeping in the sun."
+
+Example:
+User: "In the year 2050, technology will"
+You: "transform how we communicate, work, and experience daily life."`;
 
   const response = await gemini.models.generateContent({
     model: "gemini-2.5-flash",
     config: {
       systemInstruction: systemPrompt,
     },
-    contents: prompt,
+    contents: `Continue this text (do NOT repeat it, only add new words): "${prompt}"`,
   });
 
-  const text = response.text || "";
-  const words = text.split(/\s+/).filter(w => w.length > 0);
+  let text = response.text || "";
+  
+  text = text.replace(/^["'\s]+|["'\s]+$/g, "").trim();
+  
+  const promptWords = prompt.toLowerCase().split(/\s+/);
+  const textWords = text.split(/\s+/).filter(w => w.length > 0);
+  
+  let startIndex = 0;
+  for (let i = 0; i < Math.min(textWords.length, promptWords.length + 3); i++) {
+    const cleanWord = textWords[i]?.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const promptWord = promptWords[i]?.replace(/[^a-z0-9]/g, "");
+    if (cleanWord === promptWord) {
+      startIndex = i + 1;
+    } else {
+      break;
+    }
+  }
+  
+  const continuationWords = textWords.slice(startIndex);
 
-  const tokens: GeneratedToken[] = words.map((word) => {
+  const tokens: GeneratedToken[] = continuationWords.map((word) => {
     const alternatives = generateMockAlternatives(word);
     return {
       token: word,
@@ -47,17 +77,41 @@ async function generateWithOpenAI(prompt: string): Promise<GeneratedToken[]> {
     messages: [
       {
         role: "system",
-        content: "Generate a thoughtful response. Keep it concise (10-20 words).",
+        content: `You are a text completion engine. Your ONLY job is to continue the text that the user provides.
+
+CRITICAL RULES:
+1. Do NOT repeat any part of the user's text
+2. Do NOT add quotation marks, commentary, or explanations  
+3. Simply continue writing from exactly where the user left off
+4. Generate 8-15 additional words that naturally continue the text
+5. Return ONLY the continuation, nothing else`,
       },
-      { role: "user", content: prompt },
+      { role: "user", content: `Continue this text (do NOT repeat it, only add new words): "${prompt}"` },
     ],
     max_tokens: 100,
   });
 
-  const text = response.choices[0]?.message?.content || "";
-  const words = text.split(/\s+/).filter(w => w.length > 0);
+  let text = response.choices[0]?.message?.content || "";
+  
+  text = text.replace(/^["'\s]+|["'\s]+$/g, "").trim();
+  
+  const promptWords = prompt.toLowerCase().split(/\s+/);
+  const textWords = text.split(/\s+/).filter(w => w.length > 0);
+  
+  let startIndex = 0;
+  for (let i = 0; i < Math.min(textWords.length, promptWords.length + 3); i++) {
+    const cleanWord = textWords[i]?.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const promptWord = promptWords[i]?.replace(/[^a-z0-9]/g, "");
+    if (cleanWord === promptWord) {
+      startIndex = i + 1;
+    } else {
+      break;
+    }
+  }
+  
+  const continuationWords = textWords.slice(startIndex);
 
-  const tokens: GeneratedToken[] = words.map((word) => {
+  const tokens: GeneratedToken[] = continuationWords.map((word) => {
     const alternatives = generateMockAlternatives(word);
     return {
       token: word,
@@ -186,6 +240,52 @@ export async function registerRoutes(
       console.error("Generation error:", error);
       return res.status(500).json({ 
         error: "Failed to generate response",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
+  app.post("/api/regenerate", async (req, res) => {
+    try {
+      const parseResult = regenerateRequestSchema.safeParse(req.body);
+      
+      if (!parseResult.success) {
+        return res.status(400).json({ 
+          error: "Invalid request", 
+          details: parseResult.error.errors 
+        });
+      }
+
+      const { originalPrompt, tokensBeforeChange, newToken, model } = parseResult.data;
+      
+      const newPrompt = [originalPrompt, ...tokensBeforeChange, newToken].join(" ");
+
+      let tokens: GeneratedToken[];
+
+      if (model === "openai") {
+        if (!openai) {
+          return res.status(400).json({ 
+            error: "OpenAI API key not configured" 
+          });
+        }
+        tokens = await generateWithOpenAI(newPrompt);
+      } else {
+        if (!process.env.GEMINI_API_KEY) {
+          return res.status(400).json({ 
+            error: "Gemini API key not configured" 
+          });
+        }
+        tokens = await generateWithGemini(newPrompt);
+      }
+
+      return res.json({ 
+        tokens, 
+        model: model === "openai" ? "GPT-4o" : "Gemini 2.5 Flash" 
+      });
+    } catch (error) {
+      console.error("Regeneration error:", error);
+      return res.status(500).json({ 
+        error: "Failed to regenerate response",
         details: error instanceof Error ? error.message : "Unknown error"
       });
     }
