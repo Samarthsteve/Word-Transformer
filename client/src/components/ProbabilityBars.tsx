@@ -8,13 +8,15 @@ type ProbabilityBarsProps = {
   isVisible: boolean;
   onAlternativeClick?: (token: string) => void;
   isRegenerating?: boolean;
+  selectedAlternative?: string | null;
 };
 
-export function ProbabilityBars({ alternatives, currentToken, isVisible, onAlternativeClick, isRegenerating }: ProbabilityBarsProps) {
-  const allTokens = [
-    { token: currentToken, probability: alternatives.length > 0 ? Math.max(...alternatives.map(a => a.probability)) + 0.1 : 0.9 },
-    ...alternatives,
-  ].sort((a, b) => b.probability - a.probability).slice(0, 6);
+export function ProbabilityBars({ alternatives, currentToken, isVisible, onAlternativeClick, isRegenerating, selectedAlternative }: ProbabilityBarsProps) {
+  const chosenToken = selectedAlternative || currentToken;
+  
+  const allTokens = alternatives.length > 0 
+    ? [...alternatives].sort((a, b) => b.probability - a.probability).slice(0, 6)
+    : [{ token: currentToken, probability: 0.9 }];
 
   const maxProbability = Math.max(...allTokens.map((t) => t.probability), 0.01);
 
@@ -40,12 +42,11 @@ export function ProbabilityBars({ alternatives, currentToken, isVisible, onAlter
             )}
           </div>
           {allTokens.map((item, index) => {
-            const isChosen = item.token === currentToken;
+            const isChosen = item.token === chosenToken;
             const barWidth = (item.probability / maxProbability) * 100;
             const displayPercentage = (item.probability * 100).toFixed(1);
 
-            const isAlternative = !isChosen && item.token !== currentToken;
-            const isClickable = isAlternative && onAlternativeClick && !isRegenerating;
+            const isClickable = !isChosen && onAlternativeClick && !isRegenerating;
             return (
               <motion.div
                 key={`${item.token}-${index}`}
