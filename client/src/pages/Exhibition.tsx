@@ -3,12 +3,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import type { GeneratedToken, GenerateResponse, RegenerateRequest } from "@shared/schema";
-import { Sparkles, Play, SkipForward, RotateCcw, ChevronRight } from "lucide-react";
+import { Sparkles, Play, SkipForward, RotateCcw, ChevronRight, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { TransformerPipeline } from "@/components/TransformerPipeline";
 import { ModelSelector } from "@/components/ModelSelector";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { EducationalAnnotation } from "@/components/EducationalAnnotation";
 import { presetPrompts } from "@shared/schema";
 
 type AnnotationState = "idle" | "generating" | "revealing" | "showing-probabilities" | "complete" | "regenerating";
@@ -96,7 +97,7 @@ export default function Exhibition() {
       if (newIndex === tokens.length - 1) {
         setTimeout(() => {
           setAnnotationState("complete");
-        }, 1500);
+        }, 2000);
       }
     }
   }, [currentIndex, tokens.length]);
@@ -118,7 +119,7 @@ export default function Exhibition() {
 
       setTimeout(() => {
         revealNext(index + 1);
-      }, 100);
+      }, 150);
     };
 
     revealNext(currentIndex + 1);
@@ -205,62 +206,101 @@ export default function Exhibition() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0, y: -50 }}
-              className="flex-1 flex flex-col items-center justify-center px-8"
+              className="flex-1 flex flex-col items-center justify-center px-4 md:px-8"
             >
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
-                className="text-center mb-12"
+                className="text-center mb-6 md:mb-12"
               >
-                <div className="flex items-center justify-center gap-3 mb-4">
-                  <Sparkles className="w-8 h-8 text-primary" />
-                  <h1 className="text-5xl md:text-7xl font-bold tracking-tight">
+                <div className="flex items-center justify-center gap-2 md:gap-3 mb-2 md:mb-4">
+                  <motion.div
+                    animate={{ rotate: [0, 10, -10, 0] }}
+                    transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
+                  >
+                    <Sparkles className="w-6 h-6 md:w-8 md:h-8 text-primary" />
+                  </motion.div>
+                  <h1 className="text-4xl md:text-7xl font-bold tracking-tight">
                     <span className="text-foreground">Trans</span>
                     <span className="text-primary">former</span>
                   </h1>
                 </div>
-                <p className="text-xl md:text-2xl text-muted-foreground font-light">
+                <p className="text-lg md:text-2xl text-muted-foreground font-light">
                   Watch AI think — one token at a time
                 </p>
+                
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5 }}
+                  className="mt-4 md:mt-6 max-w-xl mx-auto"
+                >
+                  <div className="flex items-start gap-3 p-3 md:p-4 rounded-xl bg-card/60 backdrop-blur-sm border border-border/50 text-left">
+                    <Info className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                    <div className="text-xs md:text-sm text-muted-foreground">
+                      <span className="text-foreground font-medium">How does AI generate text?</span>
+                      <br />
+                      Transformers predict the next word by looking at all previous words. 
+                      Enter a prompt below and watch the model generate a response, revealing 
+                      the probability of each word choice!
+                    </div>
+                  </div>
+                </motion.div>
               </motion.div>
 
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4 }}
-                className="w-full max-w-2xl space-y-6"
+                className="w-full max-w-2xl space-y-4 md:space-y-6"
               >
-                <Textarea
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  placeholder="Enter your prompt..."
-                  disabled={isGenerating}
-                  className="min-h-[140px] text-xl md:text-2xl resize-none bg-muted/30 border-muted-foreground/20 focus:border-primary/50 placeholder:text-muted-foreground/40"
-                  data-testid="input-prompt"
-                />
-
-                <div className="flex flex-wrap gap-2 justify-center">
-                  {presetPrompts.slice(0, 3).map((preset, index) => (
-                    <Button
-                      key={index}
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setPrompt(preset)}
-                      className="text-xs bg-muted/20 border-muted-foreground/20 hover:border-primary/50"
-                      data-testid={`button-preset-${index}`}
+                <div className="relative">
+                  <Textarea
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    placeholder="Type your prompt here... (e.g., 'Once upon a time, in a land far away')"
+                    disabled={isGenerating}
+                    className="min-h-[100px] md:min-h-[140px] text-base md:text-xl resize-none bg-card/60 border-2 border-muted-foreground/20 focus:border-primary/50 placeholder:text-muted-foreground/40 rounded-xl"
+                    data-testid="input-prompt"
+                  />
+                  {prompt.length > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="absolute bottom-2 right-3 text-xs text-muted-foreground/50"
                     >
-                      {preset.length > 40 ? preset.slice(0, 40) + "..." : preset}
-                    </Button>
-                  ))}
+                      {prompt.length} chars
+                    </motion.div>
+                  )}
                 </div>
 
-                <div className="flex justify-center">
+                <div className="space-y-2">
+                  <div className="text-xs text-muted-foreground/60 text-center uppercase tracking-wider">
+                    Or try a preset
+                  </div>
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    {presetPrompts.slice(0, 4).map((preset, index) => (
+                      <Button
+                        key={index}
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPrompt(preset)}
+                        className="text-[10px] md:text-xs bg-card/40 border-muted-foreground/20 hover:border-primary/50 hover:bg-primary/10"
+                        data-testid={`button-preset-${index}`}
+                      >
+                        {preset.length > 35 ? preset.slice(0, 35) + "..." : preset}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex justify-center pt-2">
                   <Button
                     onClick={handleGenerate}
                     disabled={!prompt.trim() || isGenerating}
                     size="lg"
-                    className="text-lg px-12 py-6 gap-3"
+                    className="text-base md:text-lg px-8 md:px-12 py-5 md:py-6 gap-2 md:gap-3 shadow-lg shadow-primary/20"
                     data-testid="button-generate"
                   >
                     {isGenerating ? (
@@ -269,14 +309,14 @@ export default function Exhibition() {
                           animate={{ rotate: 360 }}
                           transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                         >
-                          <Sparkles className="w-5 h-5" />
+                          <Sparkles className="w-4 h-4 md:w-5 md:h-5" />
                         </motion.div>
                         Processing...
                       </>
                     ) : (
                       <>
-                        <Play className="w-5 h-5" />
-                        Generate
+                        <Play className="w-4 h-4 md:w-5 md:h-5" />
+                        Generate Response
                       </>
                     )}
                   </Button>
@@ -291,11 +331,11 @@ export default function Exhibition() {
               exit={{ opacity: 0 }}
               className="flex-1 flex flex-col"
             >
-              <div className="pt-20 pb-4 px-8 text-center">
+              <div className="pt-16 md:pt-20 pb-2 md:pb-4 px-4 md:px-8 text-center">
                 <motion.p
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 0.6 }}
-                  className="text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto font-light italic"
+                  className="text-sm md:text-xl text-muted-foreground max-w-3xl mx-auto font-light italic truncate"
                 >
                   "{prompt}"
                 </motion.p>
@@ -316,33 +356,24 @@ export default function Exhibition() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3 }}
-                className="pb-8 flex flex-col items-center gap-4"
+                className="px-4 pb-4 md:pb-8 flex flex-col items-center gap-3 md:gap-4"
               >
-                <div className="flex items-center gap-2 text-sm text-muted-foreground font-mono">
-                  <span data-testid="text-token-counter">
-                    {currentIndex + 1} / {tokens.length}
-                  </span>
-                  {isComplete && (
-                    <motion.span
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="text-green-500 dark:text-green-400 ml-2"
-                    >
-                      Complete
-                    </motion.span>
-                  )}
-                </div>
+                <EducationalAnnotation 
+                  state={annotationState}
+                  currentTokenIndex={currentIndex}
+                  totalTokens={tokens.length}
+                />
 
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3 md:gap-4 flex-wrap justify-center">
                   <Button
                     onClick={handleNext}
                     disabled={!canNext}
                     size="lg"
-                    className="gap-2 px-8"
+                    className="gap-2 px-6 md:px-8"
                     data-testid="button-next"
                   >
-                    <ChevronRight className="w-5 h-5" />
-                    Next
+                    <ChevronRight className="w-4 h-4 md:w-5 md:h-5" />
+                    Next Token
                   </Button>
 
                   <Button
@@ -353,8 +384,8 @@ export default function Exhibition() {
                     className="gap-2"
                     data-testid="button-fast-forward"
                   >
-                    <SkipForward className="w-5 h-5" />
-                    Skip
+                    <SkipForward className="w-4 h-4 md:w-5 md:h-5" />
+                    Skip All
                   </Button>
 
                   <Button
@@ -364,9 +395,13 @@ export default function Exhibition() {
                     className="gap-2"
                     data-testid="button-reset"
                   >
-                    <RotateCcw className="w-5 h-5" />
+                    <RotateCcw className="w-4 h-4 md:w-5 md:h-5" />
                     Reset
                   </Button>
+                </div>
+                
+                <div className="text-[10px] md:text-xs text-muted-foreground/50 text-center">
+                  Press <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">Space</kbd> or <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">Enter</kbd> for next token
                 </div>
               </motion.div>
             </motion.div>
