@@ -1,7 +1,8 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useMemo } from "react";
 import type { GeneratedToken } from "@shared/schema";
-import { Zap, Sparkles } from "lucide-react";
+import { Zap, Sparkles, Brain, Layers, ArrowRight, Target } from "lucide-react";
+import { AttentionVisualization } from "./AttentionVisualization";
 
 type TransformerPipelineProps = {
   tokens: GeneratedToken[];
@@ -10,6 +11,7 @@ type TransformerPipelineProps = {
   isRegenerating: boolean;
   onAlternativeClick?: (token: string) => void;
   selectedAlternative?: string | null;
+  showAttention?: boolean;
 };
 
 export function TransformerPipeline({
@@ -19,6 +21,7 @@ export function TransformerPipeline({
   isRegenerating,
   onAlternativeClick,
   selectedAlternative,
+  showAttention = true,
 }: TransformerPipelineProps) {
   const visibleTokens = tokens.slice(0, currentIndex + 1);
   const currentToken = currentIndex >= 0 && currentIndex < tokens.length ? tokens[currentIndex] : null;
@@ -46,354 +49,328 @@ export function TransformerPipeline({
     : 1;
 
   return (
-    <div className="w-full h-full flex flex-col">
-      <div className="flex-1 flex items-center justify-center gap-4 md:gap-8 px-4 md:px-8">
-        <div className="flex-1 flex flex-col items-end justify-center pr-2 md:pr-4 min-w-0">
-          <div className="text-[10px] md:text-xs uppercase tracking-widest text-muted-foreground/60 mb-2 md:mb-4">
-            Context Tokens
+    <div className="w-full h-full flex flex-col overflow-hidden">
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4 px-4 py-2 min-h-0">
+        <div className="flex flex-col min-h-0 lg:border-r lg:border-border/30 lg:pr-4">
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground/60 mb-2 flex items-center gap-2">
+            <Layers className="w-3 h-3" />
+            <span>Input Context</span>
+            <span className="ml-auto text-primary/60 font-mono">
+              {visibleTokens.length > 0 ? visibleTokens.length - 1 : 0} tokens
+            </span>
           </div>
-          <div className="flex flex-wrap gap-1.5 md:gap-2 justify-end max-w-xs md:max-w-md">
-            <AnimatePresence mode="popLayout">
-              {visibleTokens.slice(0, -1).map((t, i) => (
-                <motion.span
-                  key={`context-${i}-${t.token}`}
-                  initial={{ opacity: 0, scale: 0.8, x: -10 }}
-                  animate={{ opacity: 0.7, scale: 1, x: 0 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  transition={{ duration: 0.3 }}
-                  className="px-2 md:px-3 py-1 md:py-1.5 bg-muted/40 rounded-md text-sm md:text-lg font-mono text-foreground/70"
-                  data-testid={`context-token-${i}`}
-                >
-                  {t.token}
-                </motion.span>
-              ))}
-            </AnimatePresence>
+          
+          <div className="flex-1 overflow-y-auto scrollbar-thin pr-2">
+            <div className="flex flex-wrap gap-1.5 content-start">
+              <AnimatePresence mode="popLayout">
+                {visibleTokens.slice(0, -1).map((t, i) => (
+                  <motion.span
+                    key={`context-${i}-${t.token}`}
+                    initial={{ opacity: 0, scale: 0.8, y: 10 }}
+                    animate={{ opacity: 0.8, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.8 }}
+                    transition={{ duration: 0.2, delay: i * 0.02 }}
+                    className="px-2 py-1 bg-muted/50 rounded text-xs font-mono text-foreground/80 border border-border/30"
+                    data-testid={`context-token-${i}`}
+                  >
+                    {t.token}
+                  </motion.span>
+                ))}
+              </AnimatePresence>
+            </div>
           </div>
 
           {currentToken && (
             <motion.div
-              key={`input-token-${currentIndex}-${currentToken.token}`}
-              initial={{ opacity: 0, x: -50 }}
+              key={`current-input-${currentIndex}`}
+              initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.4 }}
-              className="mt-4 md:mt-6"
+              className="mt-3 pt-3 border-t border-border/30"
             >
+              <div className="text-[10px] uppercase tracking-widest text-primary/60 mb-1.5 flex items-center gap-1">
+                <Target className="w-3 h-3" />
+                <span>Current Token</span>
+              </div>
               <motion.div 
-                className="px-4 md:px-6 py-2 md:py-3 bg-primary/20 border-2 border-primary/50 rounded-xl text-lg md:text-2xl font-mono text-primary font-bold shadow-lg shadow-primary/20"
+                className="inline-flex items-center gap-2 px-3 py-2 bg-primary/15 border border-primary/40 rounded-lg"
                 animate={isProcessing ? { 
-                  boxShadow: ["0 0 20px rgba(59, 130, 246, 0.3)", "0 0 40px rgba(59, 130, 246, 0.5)", "0 0 20px rgba(59, 130, 246, 0.3)"]
+                  boxShadow: ["0 0 10px rgba(59, 130, 246, 0.2)", "0 0 25px rgba(59, 130, 246, 0.4)", "0 0 10px rgba(59, 130, 246, 0.2)"]
                 } : {}}
                 transition={{ duration: 1, repeat: isProcessing ? Infinity : 0 }}
               >
-                {chosenToken}
+                <span className="text-lg font-mono text-primary font-bold">
+                  {chosenToken}
+                </span>
+                {isProcessing && (
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                    className="w-3 h-3 border border-primary/40 border-t-primary rounded-full"
+                  />
+                )}
               </motion.div>
             </motion.div>
           )}
         </div>
 
-        <div className="relative flex-shrink-0">
+        <div className="flex flex-col min-h-0 relative">
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground/60 mb-2 flex items-center gap-2">
+            <Brain className="w-3 h-3" />
+            <span>Transformer Processing</span>
+          </div>
+
           <motion.div
-            className="w-32 h-32 md:w-48 md:h-48 rounded-2xl bg-gradient-to-br from-primary/20 via-primary/10 to-transparent border-2 border-primary/30 flex items-center justify-center relative overflow-hidden"
+            className="flex-1 rounded-xl bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border border-primary/20 relative overflow-hidden min-h-[180px]"
             animate={{
               borderColor: isProcessing 
-                ? ["rgba(59, 130, 246, 0.3)", "rgba(59, 130, 246, 0.7)", "rgba(59, 130, 246, 0.3)"]
-                : "rgba(59, 130, 246, 0.3)",
-              boxShadow: isProcessing 
-                ? ["0 0 20px rgba(59, 130, 246, 0.2)", "0 0 60px rgba(59, 130, 246, 0.4)", "0 0 20px rgba(59, 130, 246, 0.2)"]
-                : "0 0 20px rgba(59, 130, 246, 0.1)",
+                ? ["rgba(59, 130, 246, 0.2)", "rgba(59, 130, 246, 0.5)", "rgba(59, 130, 246, 0.2)"]
+                : "rgba(59, 130, 246, 0.2)",
             }}
-            transition={{ duration: 1.2, repeat: isProcessing ? Infinity : 0 }}
+            transition={{ duration: 1.5, repeat: isProcessing ? Infinity : 0 }}
           >
             <motion.div
-              className="absolute inset-0 bg-gradient-to-t from-primary/20 to-transparent"
+              className="absolute inset-0 bg-gradient-to-t from-primary/10 to-transparent"
               animate={{
-                opacity: isProcessing ? [0.2, 0.5, 0.2] : 0.1,
+                opacity: isProcessing ? [0.1, 0.3, 0.1] : 0.05,
               }}
-              transition={{ duration: 0.8, repeat: isProcessing ? Infinity : 0 }}
+              transition={{ duration: 1, repeat: isProcessing ? Infinity : 0 }}
             />
-            
+
             {isProcessing && (
-              <>
-                {[...Array(8)].map((_, i) => (
+              <div className="absolute inset-0 overflow-hidden">
+                {[...Array(12)].map((_, i) => (
                   <motion.div
                     key={i}
-                    className="absolute w-1.5 h-1.5 rounded-full bg-primary"
-                    initial={{ 
-                      x: -80, 
-                      y: (i - 4) * 15,
-                      opacity: 0,
-                      scale: 0.5
+                    className="absolute w-1 h-1 rounded-full bg-primary/60"
+                    style={{
+                      left: `${10 + (i % 4) * 25}%`,
+                      top: `${20 + Math.floor(i / 4) * 30}%`,
                     }}
                     animate={{ 
-                      x: [-80, 0, 80],
                       opacity: [0, 1, 0],
-                      scale: [0.5, 1.2, 0.5]
+                      scale: [0.5, 1.5, 0.5],
+                      x: [0, 20, 40],
                     }}
                     transition={{ 
                       duration: 1.5,
-                      delay: i * 0.15,
+                      delay: i * 0.1,
                       repeat: Infinity,
-                      ease: "easeInOut"
                     }}
                   />
                 ))}
-
-                <motion.div
-                  className="absolute inset-4 border-2 border-dashed border-primary/30 rounded-xl"
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
-                />
-              </>
+              </div>
             )}
 
-            <div className="relative z-10 text-center">
-              <motion.div 
-                className="flex items-center justify-center gap-1 md:gap-2 mb-1 md:mb-2"
-                animate={{ 
-                  scale: isProcessing ? [1, 1.1, 1] : 1,
-                }}
-                transition={{ duration: 0.8, repeat: isProcessing ? Infinity : 0 }}
-              >
-                {isProcessing ? (
-                  <Zap className="w-6 h-6 md:w-8 md:h-8 text-primary" />
-                ) : (
-                  <Sparkles className="w-6 h-6 md:w-8 md:h-8 text-primary" />
-                )}
-              </motion.div>
-              <div className="text-[10px] md:text-xs uppercase tracking-widest text-muted-foreground font-medium">
-                Transformer
+            {showAttention && (
+              <AttentionVisualization
+                tokens={visibleTokens.map(t => t.token)}
+                currentTokenIndex={currentIndex}
+                isProcessing={isProcessing}
+              />
+            )}
+
+            {!showAttention && (
+              <div className="h-full flex items-center justify-center">
+                <div className="text-center">
+                  <motion.div 
+                    className="flex items-center justify-center mb-2"
+                    animate={{ 
+                      scale: isProcessing ? [1, 1.1, 1] : 1,
+                    }}
+                    transition={{ duration: 0.8, repeat: isProcessing ? Infinity : 0 }}
+                  >
+                    {isProcessing ? (
+                      <Zap className="w-8 h-8 text-primary" />
+                    ) : (
+                      <Sparkles className="w-8 h-8 text-primary/60" />
+                    )}
+                  </motion.div>
+                  <div className="text-xs text-muted-foreground">
+                    {isProcessing ? "Processing..." : "Ready"}
+                  </div>
+                </div>
               </div>
-              {isProcessing && (
-                <motion.div 
-                  className="text-[8px] md:text-[10px] text-primary/70 mt-1"
-                  animate={{ opacity: [0.5, 1, 0.5] }}
-                  transition={{ duration: 1, repeat: Infinity }}
-                >
-                  Processing...
-                </motion.div>
-              )}
-            </div>
+            )}
           </motion.div>
 
-          <AnimatePresence>
-            {isProcessing && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="absolute -top-2 md:-top-3 -right-2 md:-right-3"
-              >
-                <motion.div
-                  className="w-4 h-4 md:w-6 md:h-6 rounded-full bg-primary flex items-center justify-center"
-                  animate={{ scale: [1, 1.2, 1] }}
-                  transition={{ duration: 0.5, repeat: Infinity }}
-                >
-                  <div className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-primary-foreground" />
-                </motion.div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          <div className="mt-2 flex items-center justify-center gap-2 text-[10px] text-muted-foreground/50">
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-full bg-primary/40" />
+              <span>Self-Attention</span>
+            </div>
+            <ArrowRight className="w-3 h-3" />
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-full bg-green-500/40" />
+              <span>Feed-Forward</span>
+            </div>
+            <ArrowRight className="w-3 h-3" />
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-full bg-orange-500/40" />
+              <span>Softmax</span>
+            </div>
+          </div>
         </div>
 
-        <div className="flex-1 flex flex-col items-start justify-center pl-2 md:pl-4 min-w-0">
-          <div className="text-[10px] md:text-xs uppercase tracking-widest text-muted-foreground/60 mb-2 md:mb-4 flex items-center gap-2">
-            <span>Output Distribution</span>
+        <div className="flex flex-col min-h-0 lg:border-l lg:border-border/30 lg:pl-4">
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground/60 mb-2 flex items-center gap-2">
+            <span>Probability Distribution</span>
             {showProbabilities && allTokens.length > 0 && (
               <motion.span
                 initial={{ opacity: 0, scale: 0.5 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="px-1.5 md:px-2 py-0.5 bg-primary/20 text-primary text-[8px] md:text-[10px] rounded-full font-bold"
+                className="px-1.5 py-0.5 bg-green-500/20 text-green-500 text-[8px] rounded-full font-bold"
               >
                 READY
               </motion.span>
             )}
           </div>
           
-          <AnimatePresence mode="wait">
-            {showProbabilities && allTokens.length > 0 && chosenToken ? (
-              <motion.div
-                key={`probability-output-${currentIndex}-${chosenToken}`}
-                initial={{ opacity: 0, x: 30 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.3 }}
-                className="w-full max-w-xs md:max-w-sm space-y-1.5 md:space-y-2"
-              >
-                {allTokens.map((item, index) => {
-                  const isChosen = item.token === chosenToken;
-                  const barWidth = (item.probability / maxProbability) * 100;
-                  const displayPercentage = (item.probability * 100).toFixed(1);
-                  const isClickable = !isChosen && onAlternativeClick && !isRegenerating;
+          <div className="flex-1 overflow-y-auto scrollbar-thin">
+            <AnimatePresence mode="wait">
+              {showProbabilities && allTokens.length > 0 && chosenToken ? (
+                <motion.div
+                  key={`probability-output-${currentIndex}-${chosenToken}`}
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -10 }}
+                  transition={{ duration: 0.3 }}
+                  className="space-y-2"
+                >
+                  {allTokens.map((item, index) => {
+                    const isChosen = item.token === chosenToken;
+                    const barWidth = (item.probability / maxProbability) * 100;
+                    const displayPercentage = (item.probability * 100).toFixed(1);
+                    const isClickable = !isChosen && onAlternativeClick && !isRegenerating;
 
-                  return (
-                    <motion.div
-                      key={`${item.token}-${index}`}
-                      initial={{ opacity: 0, x: 30 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.05, duration: 0.3 }}
-                      className={`flex items-center gap-2 md:gap-3 p-1.5 md:p-2 rounded-lg transition-all ${
-                        isClickable 
-                          ? "cursor-pointer hover:bg-muted/40 hover:scale-[1.02]" 
-                          : ""
-                      } ${isChosen ? "bg-primary/10" : ""}`}
-                      onClick={() => isClickable && onAlternativeClick(item.token)}
-                      whileHover={isClickable ? { x: 4 } : {}}
-                      data-testid={`pipeline-bar-${index}`}
-                    >
-                      <div className="w-14 md:w-20 text-right shrink-0">
-                        <span className={`font-mono text-xs md:text-sm truncate block ${
-                          isChosen ? "text-primary font-bold" : "text-foreground/60"
-                        }`}>
-                          {item.token}
-                        </span>
-                      </div>
-                      
-                      <div className="flex-1 h-6 md:h-8 bg-muted/20 rounded-md overflow-hidden relative">
-                        <motion.div
-                          initial={{ width: 0 }}
-                          animate={{ width: `${barWidth}%` }}
-                          transition={{ delay: index * 0.05 + 0.1, duration: 0.5, ease: "easeOut" }}
-                          className={`h-full rounded-md ${
-                            isChosen 
-                              ? "bg-gradient-to-r from-primary to-primary/70" 
-                              : "bg-gradient-to-r from-muted-foreground/40 to-muted-foreground/20"
-                          }`}
-                        />
+                    return (
+                      <motion.div
+                        key={`${item.token}-${index}`}
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.05, duration: 0.3 }}
+                        className={`p-2 rounded-lg transition-all ${
+                          isClickable 
+                            ? "cursor-pointer hover:bg-muted/40 hover:scale-[1.02]" 
+                            : ""
+                        } ${isChosen ? "bg-primary/10 border border-primary/30" : "bg-muted/20"}`}
+                        onClick={() => isClickable && onAlternativeClick(item.token)}
+                        whileHover={isClickable ? { x: 4 } : {}}
+                        data-testid={`pipeline-bar-${index}`}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className={`font-mono text-xs ${
+                            isChosen ? "text-primary font-bold" : "text-foreground/70"
+                          }`}>
+                            "{item.token}"
+                          </span>
+                          <motion.span
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: index * 0.05 + 0.2 }}
+                            className={`font-mono text-[10px] ${
+                              isChosen ? "text-primary font-bold" : "text-muted-foreground"
+                            }`}
+                          >
+                            {displayPercentage}%
+                          </motion.span>
+                        </div>
+                        
+                        <div className="h-2 bg-muted/30 rounded overflow-hidden">
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${barWidth}%` }}
+                            transition={{ delay: index * 0.05 + 0.1, duration: 0.4, ease: "easeOut" }}
+                            className={`h-full rounded ${
+                              isChosen 
+                                ? "bg-gradient-to-r from-primary to-primary/70" 
+                                : "bg-gradient-to-r from-muted-foreground/40 to-muted-foreground/20"
+                            }`}
+                          />
+                        </div>
+                        
                         {isChosen && (
                           <motion.div 
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
-                            transition={{ delay: index * 0.05 + 0.3 }}
-                            className="absolute inset-0 flex items-center justify-center"
+                            transition={{ delay: 0.3 }}
+                            className="mt-1 text-[9px] text-primary/70 font-medium"
                           >
-                            <span className="text-[8px] md:text-[10px] font-bold text-primary-foreground uppercase tracking-wider drop-shadow-sm">
-                              Selected
-                            </span>
+                            Selected choice
                           </motion.div>
                         )}
-                      </div>
-
-                      <div className="w-10 md:w-14 text-right shrink-0">
-                        <motion.span
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          transition={{ delay: index * 0.05 + 0.2 }}
-                          className={`font-mono text-[10px] md:text-xs ${
-                            isChosen ? "text-primary font-bold" : "text-muted-foreground"
-                          }`}
-                        >
-                          {displayPercentage}%
-                        </motion.span>
-                      </div>
-                    </motion.div>
-                  );
-                })}
-                
-                {onAlternativeClick && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.4 }}
-                    className="text-[10px] md:text-xs text-muted-foreground/50 text-center mt-3 md:mt-4 italic"
-                  >
-                    Click any alternative to explore different paths
-                  </motion.div>
-                )}
-              </motion.div>
-            ) : isProcessing ? (
-              <motion.div
-                key="processing-state"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="flex flex-col items-start gap-3"
-              >
-                <div className="flex items-center gap-2 text-muted-foreground/60 text-xs md:text-sm">
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                    className="w-3 h-3 md:w-4 md:h-4 border-2 border-primary/40 border-t-primary rounded-full"
-                  />
-                  <span>Computing probabilities...</span>
-                </div>
-
-                <div className="w-full max-w-xs md:max-w-sm space-y-1.5 md:space-y-2">
-                  {[0.8, 0.5, 0.3, 0.2, 0.1].map((width, i) => (
+                      </motion.div>
+                    );
+                  })}
+                  
+                  {onAlternativeClick && (
                     <motion.div
-                      key={i}
-                      className="flex items-center gap-2 md:gap-3 p-1.5 md:p-2 rounded-lg"
                       initial={{ opacity: 0 }}
-                      animate={{ opacity: 0.3 }}
-                      transition={{ delay: i * 0.1 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.4 }}
+                      className="text-[10px] text-muted-foreground/50 text-center pt-2 border-t border-border/30 mt-3"
                     >
-                      <div className="w-14 md:w-20 h-3 md:h-4 bg-muted/30 rounded animate-pulse" />
-                      <div className="flex-1 h-6 md:h-8 bg-muted/20 rounded-md overflow-hidden">
-                        <motion.div
-                          className="h-full bg-muted/30 rounded-md"
-                          animate={{ width: [`${width * 50}%`, `${width * 100}%`, `${width * 50}%`] }}
-                          transition={{ duration: 1.5, repeat: Infinity }}
-                        />
-                      </div>
-                      <div className="w-10 md:w-14 h-3 md:h-4 bg-muted/30 rounded animate-pulse" />
+                      Click any alternative to explore a different path
                     </motion.div>
-                  ))}
-                </div>
-              </motion.div>
-            ) : currentIndex < 0 ? (
-              <motion.div
-                key="idle-state"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="text-muted-foreground/40 text-xs md:text-sm"
-              >
-                Click "Next Token" to reveal the first token
-              </motion.div>
-            ) : null}
-          </AnimatePresence>
-        </div>
-      </div>
-
-      <div className="flex justify-center pb-4 md:pb-8">
-        <div className="flex flex-wrap gap-1.5 md:gap-2 justify-center max-w-4xl px-4">
-          <AnimatePresence mode="popLayout">
-            {visibleTokens.map((t, i) => {
-              const isCurrentToken = i === currentIndex;
-              const displayToken = i === currentIndex && selectedAlternative ? selectedAlternative : t.token;
-              
-              return (
-                <motion.span
-                  key={`output-${i}-${t.token}`}
-                  initial={{ opacity: 0, y: 20, scale: 0.8 }}
-                  animate={{ 
-                    opacity: isCurrentToken ? 1 : 0.7, 
-                    y: 0, 
-                    scale: 1 
-                  }}
-                  exit={{ opacity: 0, y: -20, scale: 0.8 }}
-                  transition={{ duration: 0.3 }}
-                  className={`px-2 md:px-4 py-1 md:py-2 rounded-lg font-mono ${
-                    isCurrentToken 
-                      ? "text-xl md:text-3xl font-bold text-primary bg-primary/10 border border-primary/30 shadow-lg shadow-primary/10" 
-                      : "text-lg md:text-2xl text-foreground/70"
-                  }`}
-                  data-testid={`output-token-${i}`}
+                  )}
+                </motion.div>
+              ) : isProcessing ? (
+                <motion.div
+                  key="processing-state"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="space-y-3"
                 >
-                  {displayToken}
-                </motion.span>
-              );
-            })}
-          </AnimatePresence>
-          
-          {(isGenerating || isRegenerating || (visibleTokens.length > 0 && currentIndex < tokens.length - 1)) && (
-            <motion.span
-              animate={{ opacity: [0.3, 1, 0.3] }}
-              transition={{ duration: 1, repeat: Infinity }}
-              className="text-xl md:text-3xl font-mono text-primary"
-            >
-              |
-            </motion.span>
-          )}
+                  <div className="flex items-center gap-2 text-muted-foreground/60 text-xs">
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      className="w-3 h-3 border-2 border-primary/40 border-t-primary rounded-full"
+                    />
+                    <span>Computing probabilities...</span>
+                  </div>
+
+                  <div className="space-y-2">
+                    {[0.8, 0.5, 0.3, 0.2, 0.1].map((width, i) => (
+                      <motion.div
+                        key={i}
+                        className="p-2 rounded-lg bg-muted/10"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 0.4 }}
+                        transition={{ delay: i * 0.1 }}
+                      >
+                        <div className="flex justify-between mb-1">
+                          <div className="w-12 h-3 bg-muted/30 rounded animate-pulse" />
+                          <div className="w-8 h-3 bg-muted/30 rounded animate-pulse" />
+                        </div>
+                        <div className="h-2 bg-muted/20 rounded overflow-hidden">
+                          <motion.div
+                            className="h-full bg-muted/30 rounded"
+                            animate={{ width: [`${width * 50}%`, `${width * 100}%`, `${width * 50}%`] }}
+                            transition={{ duration: 1.5, repeat: Infinity }}
+                          />
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                </motion.div>
+              ) : currentIndex < 0 ? (
+                <motion.div
+                  key="idle-state"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="h-full flex items-center justify-center"
+                >
+                  <div className="text-center text-muted-foreground/40 text-sm">
+                    <div className="text-2xl mb-2">📊</div>
+                    <p>Probabilities appear here</p>
+                    <p className="text-xs mt-1">after each token</p>
+                  </div>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
+          </div>
         </div>
       </div>
     </div>
