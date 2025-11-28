@@ -3,13 +3,14 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import type { GeneratedToken, GenerateResponse, RegenerateRequest } from "@shared/schema";
-import { Sparkles, Play, SkipForward, RotateCcw, ChevronRight, Info } from "lucide-react";
+import { Sparkles, Play, SkipForward, RotateCcw, ChevronRight, ChevronLeft, Info, Layers, Brain, Cpu, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { TransformerPipeline } from "@/components/TransformerPipeline";
 import { ModelSelector } from "@/components/ModelSelector";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { EducationalAnnotation } from "@/components/EducationalAnnotation";
+import { AmbientParticles } from "@/components/AmbientParticles";
 import { presetPrompts } from "@shared/schema";
 
 type AnnotationState = "idle" | "generating" | "revealing" | "showing-probabilities" | "complete" | "regenerating";
@@ -23,6 +24,7 @@ export default function Exhibition() {
   const [annotationState, setAnnotationState] = useState<AnnotationState>("idle");
   const [selectedAlternative, setSelectedAlternative] = useState<string | null>(null);
   const fastForwardRef = useRef(false);
+  const completionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const generateMutation = useMutation({
     mutationFn: async (data: { prompt: string; model: "gemini" | "openai" }) => {
@@ -86,8 +88,16 @@ export default function Exhibition() {
     generateMutation.mutate({ prompt, model: selectedModel });
   }, [prompt, selectedModel, generateMutation]);
 
+  const clearCompletionTimeout = useCallback(() => {
+    if (completionTimeoutRef.current) {
+      clearTimeout(completionTimeoutRef.current);
+      completionTimeoutRef.current = null;
+    }
+  }, []);
+
   const handleNext = useCallback(() => {
     if (currentIndex < tokens.length - 1) {
+      clearCompletionTimeout();
       const newIndex = currentIndex + 1;
       setCurrentIndex(newIndex);
       setShowProbabilities(true);
@@ -95,15 +105,33 @@ export default function Exhibition() {
       setAnnotationState("showing-probabilities");
 
       if (newIndex === tokens.length - 1) {
-        setTimeout(() => {
+        completionTimeoutRef.current = setTimeout(() => {
           setAnnotationState("complete");
         }, 2000);
       }
     }
-  }, [currentIndex, tokens.length]);
+  }, [currentIndex, tokens.length, clearCompletionTimeout]);
+
+  const handlePrevious = useCallback(() => {
+    clearCompletionTimeout();
+    
+    if (currentIndex > 0) {
+      const newIndex = currentIndex - 1;
+      setCurrentIndex(newIndex);
+      setShowProbabilities(true);
+      setSelectedAlternative(null);
+      setAnnotationState("showing-probabilities");
+    } else if (currentIndex === 0) {
+      setCurrentIndex(-1);
+      setShowProbabilities(false);
+      setSelectedAlternative(null);
+      setAnnotationState("revealing");
+    }
+  }, [currentIndex, clearCompletionTimeout]);
 
   const handleFastForward = useCallback(() => {
     if (tokens.length === 0) return;
+    clearCompletionTimeout();
     fastForwardRef.current = true;
 
     const revealNext = (index: number) => {
@@ -123,9 +151,10 @@ export default function Exhibition() {
     };
 
     revealNext(currentIndex + 1);
-  }, [currentIndex, tokens.length]);
+  }, [currentIndex, tokens.length, clearCompletionTimeout]);
 
   const handleReset = useCallback(() => {
+    clearCompletionTimeout();
     fastForwardRef.current = false;
     setTokens([]);
     setCurrentIndex(-1);
@@ -135,11 +164,12 @@ export default function Exhibition() {
     setAnnotationState("idle");
     generateMutation.reset();
     regenerateMutation.reset();
-  }, [generateMutation, regenerateMutation]);
+  }, [generateMutation, regenerateMutation, clearCompletionTimeout]);
 
   const handleAlternativeClick = useCallback((alternativeToken: string) => {
     if (currentIndex < 0 || regenerateMutation.isPending || generateMutation.isPending) return;
     
+    clearCompletionTimeout();
     const tokensBeforeChange = tokens.slice(0, currentIndex).map(t => t.token);
     
     setAnnotationState("regenerating");
@@ -151,14 +181,28 @@ export default function Exhibition() {
       newToken: alternativeToken,
       model: selectedModel,
     });
-  }, [currentIndex, tokens, prompt, selectedModel, regenerateMutation, generateMutation]);
+  }, [currentIndex, tokens, prompt, selectedModel, regenerateMutation, generateMutation, clearCompletionTimeout]);
+
+  useEffect(() => {
+    return () => {
+      if (completionTimeoutRef.current) {
+        clearTimeout(completionTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === " " || e.key === "Enter") {
+      if (e.key === " " || e.key === "Enter" || e.key === "ArrowRight") {
         if (tokens.length > 0 && currentIndex < tokens.length - 1 && !generateMutation.isPending) {
           e.preventDefault();
           handleNext();
+        }
+      }
+      if (e.key === "ArrowLeft" || e.key === "Backspace") {
+        if (tokens.length > 0 && currentIndex >= 0 && !generateMutation.isPending) {
+          e.preventDefault();
+          handlePrevious();
         }
       }
       if (e.key === "Escape") {
@@ -172,24 +216,35 @@ export default function Exhibition() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [tokens.length, currentIndex, generateMutation.isPending, handleNext, handleReset, handleFastForward]);
+  }, [tokens.length, currentIndex, generateMutation.isPending, handleNext, handlePrevious, handleReset, handleFastForward]);
 
   const isGenerating = generateMutation.isPending || regenerateMutation.isPending;
   const hasTokens = tokens.length > 0;
   const canNext = hasTokens && currentIndex < tokens.length - 1 && !isGenerating;
+  const canPrevious = hasTokens && currentIndex >= 0 && !isGenerating;
   const canFastForward = hasTokens && currentIndex < tokens.length - 1 && !isGenerating;
   const isComplete = hasTokens && currentIndex === tokens.length - 1;
   const isRegenerating = regenerateMutation.isPending;
 
   return (
     <div className="h-screen w-screen bg-background overflow-hidden relative">
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-primary/3" />
-      <div className="absolute inset-0 opacity-30">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-primary/5 rounded-full blur-3xl" />
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/8 via-background to-primary/5" />
+      <AmbientParticles count={15} active={!hasTokens || isGenerating} />
+      
+      <div className="absolute top-4 left-4 md:top-6 md:left-6 z-50">
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-card/60 backdrop-blur-md border border-border/50"
+        >
+          <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+          <span className="text-[10px] md:text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            AI Exhibition
+          </span>
+        </motion.div>
       </div>
 
-      <div className="absolute top-6 right-6 z-50 flex items-center gap-3">
+      <div className="absolute top-4 right-4 md:top-6 md:right-6 z-50 flex items-center gap-2 md:gap-3">
         <ModelSelector
           selectedModel={selectedModel}
           onModelChange={setSelectedModel}
@@ -212,38 +267,70 @@ export default function Exhibition() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
-                className="text-center mb-6 md:mb-12"
+                className="text-center mb-6 md:mb-10"
               >
-                <div className="flex items-center justify-center gap-2 md:gap-3 mb-2 md:mb-4">
+                <motion.div
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ duration: 0.8, ease: [0.4, 0, 0.2, 1] }}
+                  className="mb-4 md:mb-6"
+                >
+                  <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 border border-primary/20 mb-4 md:mb-6">
+                    <Zap className="w-3 h-3 md:w-4 md:h-4 text-primary" />
+                    <span className="text-xs md:text-sm font-medium text-primary uppercase tracking-wider">
+                      Interactive AI Demo
+                    </span>
+                  </div>
+                </motion.div>
+                
+                <div className="flex items-center justify-center gap-2 md:gap-4 mb-3 md:mb-5">
                   <motion.div
-                    animate={{ rotate: [0, 10, -10, 0] }}
-                    transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
+                    animate={{ 
+                      rotate: [0, 5, -5, 0],
+                      scale: [1, 1.1, 1]
+                    }}
+                    transition={{ duration: 3, repeat: Infinity, repeatDelay: 2 }}
                   >
-                    <Sparkles className="w-6 h-6 md:w-8 md:h-8 text-primary" />
+                    <Brain className="w-8 h-8 md:w-12 md:h-12 text-primary" />
                   </motion.div>
-                  <h1 className="text-4xl md:text-7xl font-bold tracking-tight">
-                    <span className="text-foreground">Trans</span>
-                    <span className="text-primary">former</span>
+                  <h1 className="text-5xl md:text-8xl font-black tracking-tighter">
+                    <span className="bg-gradient-to-r from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent">Trans</span>
+                    <span className="bg-gradient-to-r from-primary via-primary to-primary/70 bg-clip-text text-transparent">former</span>
                   </h1>
                 </div>
-                <p className="text-lg md:text-2xl text-muted-foreground font-light">
-                  Watch AI think — one token at a time
-                </p>
+                
+                <motion.p 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.4 }}
+                  className="text-xl md:text-3xl text-muted-foreground font-light tracking-wide"
+                >
+                  Watch AI think — <span className="text-foreground font-medium">one token at a time</span>
+                </motion.p>
                 
                 <motion.div
-                  initial={{ opacity: 0, y: 10 }}
+                  initial={{ opacity: 0, y: 15 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.5 }}
-                  className="mt-4 md:mt-6 max-w-xl mx-auto"
+                  transition={{ delay: 0.6 }}
+                  className="mt-6 md:mt-8 max-w-2xl mx-auto"
                 >
-                  <div className="flex items-start gap-3 p-3 md:p-4 rounded-xl bg-card/60 backdrop-blur-sm border border-border/50 text-left">
-                    <Info className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-                    <div className="text-xs md:text-sm text-muted-foreground">
-                      <span className="text-foreground font-medium">How does AI generate text?</span>
-                      <br />
-                      Transformers predict the next word by looking at all previous words. 
-                      Enter a prompt below and watch the model generate a response, revealing 
-                      the probability of each word choice!
+                  <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-card/80 via-card/60 to-card/80 backdrop-blur-md border border-border/50 shadow-xl">
+                    <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-primary/5 pointer-events-none" />
+                    <div className="relative p-4 md:p-6 flex items-start gap-4">
+                      <div className="p-2.5 rounded-xl bg-primary/10 border border-primary/20">
+                        <Layers className="w-5 h-5 md:w-6 md:h-6 text-primary" />
+                      </div>
+                      <div className="text-left space-y-2">
+                        <h3 className="text-sm md:text-base font-bold text-foreground">
+                          How do Transformers generate text?
+                        </h3>
+                        <p className="text-xs md:text-sm text-muted-foreground leading-relaxed">
+                          Transformers use <span className="text-foreground font-medium">self-attention</span> to understand 
+                          relationships between words. They predict the next word by analyzing the entire context, 
+                          calculating probabilities for thousands of possible continuations. 
+                          <span className="text-primary font-medium"> Try it yourself below!</span>
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </motion.div>
@@ -366,14 +453,26 @@ export default function Exhibition() {
 
                 <div className="flex items-center gap-3 md:gap-4 flex-wrap justify-center">
                   <Button
+                    onClick={handlePrevious}
+                    disabled={!canPrevious}
+                    variant="outline"
+                    size="lg"
+                    className="gap-2"
+                    data-testid="button-previous"
+                  >
+                    <ChevronLeft className="w-4 h-4 md:w-5 md:h-5" />
+                    Back
+                  </Button>
+
+                  <Button
                     onClick={handleNext}
                     disabled={!canNext}
                     size="lg"
                     className="gap-2 px-6 md:px-8"
                     data-testid="button-next"
                   >
-                    <ChevronRight className="w-4 h-4 md:w-5 md:h-5" />
                     Next Token
+                    <ChevronRight className="w-4 h-4 md:w-5 md:h-5" />
                   </Button>
 
                   <Button
@@ -390,7 +489,7 @@ export default function Exhibition() {
 
                   <Button
                     onClick={handleReset}
-                    variant="outline"
+                    variant="ghost"
                     size="lg"
                     className="gap-2"
                     data-testid="button-reset"
@@ -401,7 +500,9 @@ export default function Exhibition() {
                 </div>
                 
                 <div className="text-[10px] md:text-xs text-muted-foreground/50 text-center">
-                  Press <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">Space</kbd> or <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">Enter</kbd> for next token
+                  <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono mx-0.5">←</kbd> Previous
+                  <span className="mx-2 text-muted-foreground/30">|</span>
+                  <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono mx-0.5">→</kbd> or <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono mx-0.5">Space</kbd> Next
                 </div>
               </motion.div>
             </motion.div>

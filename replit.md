@@ -29,14 +29,22 @@ Preferred communication style: Simple, everyday language.
 - Tailwind custom theme with HSL color tokens for comprehensive theming
 
 **Key Components**:
-- `Exhibition.tsx`: Main page orchestrating the token generation flow and user interactions
+- `Exhibition.tsx`: Main page orchestrating the token generation flow and user interactions with back-track navigation
+- `TransformerPipeline.tsx`: Central visualization showing input context, transformer block with layer details, and output probability distribution
+- `EducationalAnnotation.tsx`: Step-by-step educational content explaining tokenization, embeddings, self-attention, and probability distributions
+- `AmbientParticles.tsx`: Background animation with floating particles for exhibition atmosphere
 - `PromptInput.tsx`: Text input with preset prompt suggestions
 - `TokenDisplay.tsx`: Animated display of generated tokens with focus on current token
 - `ProbabilityBars.tsx`: Visualization of token probability distributions
-- `Controls.tsx`: Generation controls (next, fast-forward, reset)
-- `EducationalAnnotation.tsx`: Contextual educational information about the generation process
+- `Controls.tsx`: Generation controls (back, next, fast-forward, reset)
 - `ModelSelector.tsx`: Toggle between Gemini and OpenAI models
 - `ThemeProvider.tsx` + `ThemeToggle.tsx`: Light/dark theme management
+
+**Navigation Features**:
+- Back Track: Navigate to previous tokens using "Back" button or Arrow Left/Backspace keys
+- Forward: Navigate to next token using "Next Token" button or Arrow Right/Space/Enter keys
+- Fast Forward: Skip to end with Ctrl/Cmd+F
+- Reset: Start over with Escape key or Reset button
 
 ### Backend Architecture
 
