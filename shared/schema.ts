@@ -12,6 +12,7 @@ export type TokenProbability = z.infer<typeof tokenProbabilitySchema>;
 export const generatedTokenSchema = z.object({
   token: z.string(),
   alternatives: z.array(tokenProbabilitySchema),
+  chosenProbability: z.number().optional(),
 });
 
 export type GeneratedToken = z.infer<typeof generatedTokenSchema>;

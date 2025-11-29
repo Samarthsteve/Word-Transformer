@@ -169,11 +169,12 @@ export function TransformerPipeline({
   }, [currentIndex, currentToken, isProcessing, hasAlternatives]);
 
   const alternatives = currentToken?.alternatives || [];
-  const chosenTokenProb = alternatives.length > 0 
-    ? Math.max(...alternatives.map(a => a.probability)) + 0.15
-    : 0.85;
-  const chosenEntry = { token: chosenToken, probability: Math.min(chosenTokenProb, 0.95) };
-  const combinedTokens = [chosenEntry, ...alternatives.filter(a => a.token !== chosenToken)];
+  const chosenTokenProb = currentToken?.chosenProbability 
+    ?? (alternatives.length > 0 
+      ? Math.max(...alternatives.map(a => a.probability)) + 0.15
+      : 0.85);
+  const chosenEntry = { token: chosenToken, probability: Math.min(chosenTokenProb, 0.99) };
+  const combinedTokens = [chosenEntry, ...alternatives.filter(a => a.token.toLowerCase() !== chosenToken.toLowerCase())];
   const allTokens = combinedTokens
     .sort((a, b) => b.probability - a.probability)
     .slice(0, 5);
@@ -399,6 +400,32 @@ export function TransformerPipeline({
                 className="text-muted-foreground/50 text-xs md:text-sm p-4 rounded-xl border border-dashed border-border/50"
               >
                 Click "Next Token" to reveal predictions
+              </motion.div>
+            ) : currentToken && !hasAlternatives ? (
+              <motion.div
+                key="no-alternatives-state"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="w-full max-w-xs md:max-w-md"
+              >
+                <div className="p-4 rounded-xl bg-muted/20 border border-dashed border-border/50">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 rounded-lg bg-primary/10 border border-primary/20">
+                      <Sparkles className="w-4 h-4 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Token Generated</p>
+                      <p className="text-xs text-muted-foreground">Real-time AI prediction</p>
+                    </div>
+                  </div>
+                  <div className="p-3 rounded-lg bg-primary/10 border border-primary/30">
+                    <span className="font-mono text-lg md:text-xl font-bold text-primary">{chosenToken}</span>
+                  </div>
+                  <p className="mt-3 text-[10px] md:text-xs text-muted-foreground/60 italic">
+                    Alternative probabilities not available for this token
+                  </p>
+                </div>
               </motion.div>
             ) : null}
           </AnimatePresence>

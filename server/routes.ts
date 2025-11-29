@@ -10,7 +10,284 @@ const openai = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   : null;
 
+function logProbToProb(logProb: number): number {
+  return Math.min(Math.max(Math.exp(logProb), 0), 1);
+}
+
+type WordLogprobData = {
+  word: string;
+  summedLogprob: number;
+  topLogprobs: Array<{ token: string; logprob: number }>;
+};
+
+function aggregateLogprobsToWords(
+  logprobsContent: Array<{
+    token: string;
+    logprob: number;
+    top_logprobs?: Array<{ token: string; logprob: number }>;
+  }>
+): WordLogprobData[] {
+  const words: WordLogprobData[] = [];
+  let currentWord = "";
+  let currentSummedLogprob = 0;
+  let currentTopLogprobs: Array<{ token: string; logprob: number }> = [];
+
+  for (const item of logprobsContent) {
+    const token = item.token;
+    
+    const startsWithSpace = token.startsWith(" ") || token.startsWith("\n");
+    const isOnlyPunctuation = /^[\s\n]*[^\w\s]+[\s\n]*$/.test(token);
+    const cleanToken = token.replace(/^[\s\n]+/, "");
+    
+    if (startsWithSpace && currentWord.length > 0) {
+      words.push({
+        word: currentWord,
+        summedLogprob: currentSummedLogprob,
+        topLogprobs: currentTopLogprobs,
+      });
+      currentWord = cleanToken;
+      currentSummedLogprob = item.logprob;
+      currentTopLogprobs = item.top_logprobs || [];
+    } else if (isOnlyPunctuation && currentWord.length > 0) {
+      currentWord += token.trim();
+      currentSummedLogprob += item.logprob;
+    } else {
+      if (currentWord.length === 0) {
+        currentWord = cleanToken;
+        currentSummedLogprob = item.logprob;
+        currentTopLogprobs = item.top_logprobs || [];
+      } else {
+        currentWord += token;
+        currentSummedLogprob += item.logprob;
+      }
+    }
+  }
+
+  if (currentWord.length > 0) {
+    words.push({
+      word: currentWord,
+      summedLogprob: currentSummedLogprob,
+      topLogprobs: currentTopLogprobs,
+    });
+  }
+
+  return words;
+}
+
+async function generateWithOpenAI(prompt: string): Promise<GeneratedToken[]> {
+  if (!openai) {
+    throw new Error("OpenAI API key not configured");
+  }
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      {
+        role: "system",
+        content: `You are a text completion engine. Your ONLY job is to continue the text that the user provides.
+
+CRITICAL RULES:
+1. Do NOT repeat any part of the user's text
+2. Do NOT add quotation marks, commentary, or explanations  
+3. Simply continue writing from exactly where the user left off
+4. Generate 8-15 additional words that naturally continue the text
+5. Return ONLY the continuation, nothing else`,
+      },
+      { role: "user", content: `Continue this text (do NOT repeat it, only add new words): "${prompt}"` },
+    ],
+    max_tokens: 100,
+    logprobs: true,
+    top_logprobs: 5,
+  });
+
+  let text = response.choices[0]?.message?.content || "";
+  const logprobsContent = response.choices[0]?.logprobs?.content || [];
+  
+  text = text.replace(/^["'\s]+|["'\s]+$/g, "").trim();
+  
+  const promptWords = prompt.toLowerCase().split(/\s+/);
+  const textWords = text.split(/\s+/).filter(w => w.length > 0);
+  
+  let startIndex = 0;
+  for (let i = 0; i < Math.min(textWords.length, promptWords.length + 3); i++) {
+    const cleanWord = textWords[i]?.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const promptWord = promptWords[i]?.replace(/[^a-z0-9]/g, "");
+    if (cleanWord === promptWord) {
+      startIndex = i + 1;
+    } else {
+      break;
+    }
+  }
+  
+  const continuationWords = textWords.slice(startIndex);
+  
+  const aggregatedWords = aggregateLogprobsToWords(logprobsContent);
+  
+  const tokens: GeneratedToken[] = [];
+  
+  for (let i = 0; i < continuationWords.length; i++) {
+    const word = continuationWords[i];
+    const alternatives: { token: string; probability: number }[] = [];
+    
+    let matchedData: WordLogprobData | undefined;
+    
+    const cleanTargetWord = word.toLowerCase().replace(/[^a-z0-9]/g, "");
+    for (let j = 0; j < aggregatedWords.length; j++) {
+      const aggWord = aggregatedWords[j];
+      const cleanAggWord = aggWord.word.toLowerCase().replace(/[^a-z0-9]/g, "");
+      if (cleanAggWord === cleanTargetWord || aggWord.word === word) {
+        matchedData = aggWord;
+        aggregatedWords.splice(j, 1);
+        break;
+      }
+    }
+    
+    let chosenTokenProb = 0.75;
+    
+    if (matchedData) {
+      chosenTokenProb = logProbToProb(matchedData.summedLogprob);
+      
+      if (matchedData.topLogprobs && matchedData.topLogprobs.length > 0) {
+        const seenTokens = new Set<string>();
+        seenTokens.add(word.toLowerCase());
+        
+        for (const alt of matchedData.topLogprobs) {
+          const cleanToken = alt.token.trim().replace(/^[\s\n]+|[\s\n]+$/g, "");
+          
+          if (cleanToken.length === 0 || /^[^\w]+$/.test(cleanToken)) {
+            continue;
+          }
+          
+          if (!seenTokens.has(cleanToken.toLowerCase())) {
+            seenTokens.add(cleanToken.toLowerCase());
+            const prob = logProbToProb(alt.logprob);
+            if (prob > 0.001 && prob < chosenTokenProb) {
+              alternatives.push({
+                token: cleanToken,
+                probability: prob,
+              });
+            }
+          }
+        }
+      }
+    }
+    
+    alternatives.sort((a, b) => b.probability - a.probability);
+    
+    const finalAlternatives = alternatives.slice(0, 5);
+    
+    if (finalAlternatives.length > 0) {
+      finalAlternatives.unshift({
+        token: word,
+        probability: chosenTokenProb,
+      });
+    }
+    
+    tokens.push({
+      token: word,
+      alternatives: finalAlternatives.filter(a => a.token !== word).slice(0, 5),
+      chosenProbability: chosenTokenProb,
+    });
+  }
+
+  return tokens;
+}
+
 async function generateWithGemini(prompt: string): Promise<GeneratedToken[]> {
+  const systemPrompt = `You are a text completion engine that provides detailed probability analysis.
+
+Your task is to:
+1. Continue the given text naturally with 8-15 words
+2. For EACH word you generate, provide 4-5 alternative words that could also fit in that position with estimated probability scores
+
+Return a JSON object with this EXACT structure:
+{
+  "tokens": [
+    {
+      "chosen": "word1",
+      "alternatives": [
+        {"token": "alt1", "probability": 0.25},
+        {"token": "alt2", "probability": 0.15},
+        {"token": "alt3", "probability": 0.10},
+        {"token": "alt4", "probability": 0.05}
+      ]
+    },
+    ...more tokens
+  ]
+}
+
+CRITICAL RULES:
+1. Do NOT repeat any part of the user's input text
+2. Only output the JSON, nothing else
+3. Probabilities should be realistic (highest around 0.3-0.5, lower ones decreasing)
+4. Alternatives should be contextually appropriate words that could replace the chosen word
+5. Each token must have 4-5 alternatives with decreasing probabilities`;
+
+  const response = await gemini.models.generateContent({
+    model: "gemini-2.5-flash",
+    config: {
+      systemInstruction: systemPrompt,
+      responseMimeType: "application/json",
+    },
+    contents: `Continue this text with probability analysis: "${prompt}"`,
+  });
+
+  let responseText = response.text || "";
+  
+  try {
+    responseText = responseText.replace(/```json\n?|\n?```/g, "").trim();
+    
+    const parsed = JSON.parse(responseText);
+    
+    if (parsed.tokens && Array.isArray(parsed.tokens)) {
+      const tokens: GeneratedToken[] = [];
+      
+      for (const tokenData of parsed.tokens) {
+        if (tokenData.chosen && typeof tokenData.chosen === "string") {
+          const alternatives: { token: string; probability: number }[] = [];
+          
+          if (Array.isArray(tokenData.alternatives)) {
+            for (const alt of tokenData.alternatives) {
+              if (alt.token && typeof alt.probability === "number") {
+                const prob = Math.min(Math.max(alt.probability, 0), 1);
+                if (alt.token.toLowerCase() !== tokenData.chosen.toLowerCase()) {
+                  alternatives.push({
+                    token: alt.token,
+                    probability: prob,
+                  });
+                }
+              }
+            }
+          }
+          
+          alternatives.sort((a, b) => b.probability - a.probability);
+          
+          const chosenProb = tokenData.chosenProbability 
+            ? Math.min(Math.max(tokenData.chosenProbability, 0), 1)
+            : alternatives.length > 0 
+              ? Math.min(alternatives[0].probability + 0.2, 0.95)
+              : 0.75;
+          
+          tokens.push({
+            token: tokenData.chosen,
+            alternatives: alternatives.slice(0, 5),
+            chosenProbability: chosenProb,
+          });
+        }
+      }
+      
+      if (tokens.length > 0) {
+        return tokens;
+      }
+    }
+  } catch (parseError) {
+    console.error("Failed to parse Gemini JSON response, falling back to simple generation:", parseError);
+  }
+  
+  return generateWithGeminiFallback(prompt);
+}
+
+async function generateWithGeminiFallback(prompt: string): Promise<GeneratedToken[]> {
   const systemPrompt = `You are a text completion engine. Your ONLY job is to continue the text that the user provides.
 
 CRITICAL RULES:
@@ -18,15 +295,7 @@ CRITICAL RULES:
 2. Do NOT add quotation marks, commentary, or explanations
 3. Simply continue writing from exactly where the user left off
 4. Generate 8-15 additional words that naturally continue the text
-5. Return ONLY the continuation, nothing else
-
-Example:
-User: "The quick brown fox"
-You: "jumps over the lazy dog sleeping in the sun."
-
-Example:
-User: "In the year 2050, technology will"
-You: "transform how we communicate, work, and experience daily life."`;
+5. Return ONLY the continuation, nothing else`;
 
   const response = await gemini.models.generateContent({
     model: "gemini-2.5-flash",
@@ -55,146 +324,73 @@ You: "transform how we communicate, work, and experience daily life."`;
   }
   
   const continuationWords = textWords.slice(startIndex);
+  
+  const alternativesPrompt = `Given these words in context: "${prompt} ${continuationWords.join(" ")}"
 
-  const tokens: GeneratedToken[] = continuationWords.map((word) => {
-    const alternatives = generateMockAlternatives(word);
-    return {
-      token: word,
-      alternatives,
-    };
-  });
+For ONLY these specific words: ${JSON.stringify(continuationWords)}
 
-  return tokens;
-}
-
-async function generateWithOpenAI(prompt: string): Promise<GeneratedToken[]> {
-  if (!openai) {
-    throw new Error("OpenAI API key not configured");
+Provide 4 alternative words for each that could replace it in context. Return JSON:
+{
+  "alternatives": {
+    "word1": [{"token": "alt1", "prob": 0.3}, {"token": "alt2", "prob": 0.2}, {"token": "alt3", "prob": 0.1}, {"token": "alt4", "prob": 0.05}],
+    ...
   }
+}`;
 
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o",
-    messages: [
-      {
-        role: "system",
-        content: `You are a text completion engine. Your ONLY job is to continue the text that the user provides.
-
-CRITICAL RULES:
-1. Do NOT repeat any part of the user's text
-2. Do NOT add quotation marks, commentary, or explanations  
-3. Simply continue writing from exactly where the user left off
-4. Generate 8-15 additional words that naturally continue the text
-5. Return ONLY the continuation, nothing else`,
+  try {
+    const altResponse = await gemini.models.generateContent({
+      model: "gemini-2.5-flash",
+      config: {
+        responseMimeType: "application/json",
       },
-      { role: "user", content: `Continue this text (do NOT repeat it, only add new words): "${prompt}"` },
-    ],
-    max_tokens: 100,
-  });
+      contents: alternativesPrompt,
+    });
 
-  let text = response.choices[0]?.message?.content || "";
-  
-  text = text.replace(/^["'\s]+|["'\s]+$/g, "").trim();
-  
-  const promptWords = prompt.toLowerCase().split(/\s+/);
-  const textWords = text.split(/\s+/).filter(w => w.length > 0);
-  
-  let startIndex = 0;
-  for (let i = 0; i < Math.min(textWords.length, promptWords.length + 3); i++) {
-    const cleanWord = textWords[i]?.toLowerCase().replace(/[^a-z0-9]/g, "");
-    const promptWord = promptWords[i]?.replace(/[^a-z0-9]/g, "");
-    if (cleanWord === promptWord) {
-      startIndex = i + 1;
-    } else {
-      break;
+    const altText = (altResponse.text || "").replace(/```json\n?|\n?```/g, "").trim();
+    const altParsed = JSON.parse(altText);
+    
+    if (altParsed.alternatives) {
+      const tokens: GeneratedToken[] = continuationWords.map((word) => {
+        const wordAlts = altParsed.alternatives[word] || [];
+        const alternatives: { token: string; probability: number }[] = [];
+        
+        for (const alt of wordAlts) {
+          if (alt.token && (alt.prob !== undefined || alt.probability !== undefined)) {
+            const prob = alt.prob || alt.probability || 0;
+            if (alt.token.toLowerCase() !== word.toLowerCase()) {
+              alternatives.push({
+                token: alt.token,
+                probability: Math.min(Math.max(prob, 0), 1),
+              });
+            }
+          }
+        }
+        
+        const sortedAlts = alternatives.slice(0, 5).sort((a, b) => b.probability - a.probability);
+        const chosenProb = sortedAlts.length > 0 
+          ? Math.min(sortedAlts[0].probability + 0.2, 0.95)
+          : 0.75;
+        
+        return {
+          token: word,
+          alternatives: sortedAlts,
+          chosenProbability: chosenProb,
+        };
+      });
+      
+      return tokens;
     }
+  } catch (altError) {
+    console.error("Failed to get alternatives from Gemini:", altError);
   }
   
-  const continuationWords = textWords.slice(startIndex);
-
-  const tokens: GeneratedToken[] = continuationWords.map((word) => {
-    const alternatives = generateMockAlternatives(word);
-    return {
-      token: word,
-      alternatives,
-    };
-  });
+  const tokens: GeneratedToken[] = continuationWords.map((word) => ({
+    token: word,
+    alternatives: [],
+    chosenProbability: 0.75,
+  }));
 
   return tokens;
-}
-
-function generateMockAlternatives(chosenWord: string): { token: string; probability: number }[] {
-  const commonWords: Record<string, string[]> = {
-    "The": ["A", "This", "That", "My", "Your"],
-    "the": ["a", "this", "that", "my", "your"],
-    "is": ["was", "are", "will", "has", "can"],
-    "are": ["were", "is", "will", "have", "can"],
-    "and": ["or", "but", "with", "then", "so"],
-    "to": ["for", "into", "towards", "with", "at"],
-    "of": ["for", "with", "in", "about", "from"],
-    "a": ["the", "one", "this", "that", "some"],
-    "in": ["on", "at", "with", "from", "to"],
-    "that": ["which", "this", "what", "who", "where"],
-    "it": ["this", "that", "he", "she", "they"],
-    "for": ["to", "with", "about", "on", "of"],
-    "you": ["we", "they", "one", "people", "someone"],
-    "with": ["and", "for", "to", "by", "from"],
-    "be": ["become", "stay", "remain", "feel", "seem"],
-    "have": ["get", "need", "want", "take", "make"],
-    "this": ["that", "the", "a", "one", "some"],
-    "will": ["can", "would", "could", "should", "may"],
-    "can": ["will", "could", "would", "may", "should"],
-    "would": ["could", "will", "should", "can", "may"],
-    "not": ["never", "also", "still", "just", "only"],
-    "as": ["like", "when", "while", "if", "because"],
-    "but": ["and", "yet", "however", "although", "while"],
-    "from": ["to", "with", "by", "in", "at"],
-    "by": ["with", "from", "through", "via", "using"],
-    "or": ["and", "but", "nor", "yet", "so"],
-    "an": ["the", "a", "one", "some", "any"],
-    "your": ["my", "our", "their", "the", "his"],
-    "which": ["that", "what", "who", "where", "when"],
-  };
-
-  const wordCategories: Record<string, string[]> = {
-    emotion: ["happy", "sad", "excited", "calm", "anxious", "peaceful", "joyful", "content"],
-    action: ["run", "walk", "think", "create", "build", "explore", "discover", "learn"],
-    adjective: ["beautiful", "amazing", "wonderful", "incredible", "fantastic", "remarkable"],
-    time: ["always", "never", "sometimes", "often", "rarely", "frequently", "occasionally"],
-    connector: ["therefore", "however", "moreover", "furthermore", "consequently", "thus"],
-  };
-
-  let alternatives: string[] = [];
-
-  if (commonWords[chosenWord]) {
-    alternatives = commonWords[chosenWord];
-  } else if (chosenWord.endsWith("ing")) {
-    alternatives = ["thinking", "creating", "building", "exploring", "learning"];
-  } else if (chosenWord.endsWith("ed")) {
-    alternatives = ["created", "explored", "discovered", "experienced", "achieved"];
-  } else if (chosenWord.endsWith("ly")) {
-    alternatives = ["quickly", "slowly", "carefully", "gently", "quietly"];
-  } else if (chosenWord.endsWith("tion")) {
-    alternatives = ["creation", "exploration", "imagination", "innovation", "generation"];
-  } else {
-    const category = Object.values(wordCategories)[Math.floor(Math.random() * Object.keys(wordCategories).length)];
-    alternatives = category.filter(w => w !== chosenWord.toLowerCase());
-  }
-
-  alternatives = alternatives.filter(w => w.toLowerCase() !== chosenWord.toLowerCase()).slice(0, 5);
-
-  let remainingProb = 0.85;
-  const probabilities: { token: string; probability: number }[] = [];
-
-  alternatives.forEach((alt, index) => {
-    const factor = Math.pow(0.5, index);
-    const prob = remainingProb * factor * (0.3 + Math.random() * 0.3);
-    probabilities.push({ token: alt, probability: Math.min(prob, 0.4) });
-    remainingProb -= prob;
-  });
-
-  probabilities.sort((a, b) => b.probability - a.probability);
-
-  return probabilities;
 }
 
 export async function registerRoutes(
