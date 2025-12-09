@@ -228,8 +228,9 @@ export default function Exhibition() {
 
   return (
     <div className="h-screen w-screen bg-background overflow-hidden relative">
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/8 via-background to-primary/5" />
-      <AmbientParticles count={15} active={!hasTokens || isGenerating} />
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-background to-indigo-950/30 dark:from-slate-950 dark:via-background dark:to-indigo-950/40" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/10 via-transparent to-transparent" />
+      <AmbientParticles count={25} active={!hasTokens || isGenerating} />
       
       <div className="absolute top-4 left-4 md:top-6 md:left-6 z-50">
         <motion.div
@@ -261,25 +262,46 @@ export default function Exhibition() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0, y: -50 }}
-              className="h-full flex flex-col items-center justify-center px-4 md:px-8 py-16"
+              className="h-full flex flex-col items-center justify-center px-4 md:px-8 py-12"
             >
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.1, duration: 0.6 }}
+                className="flex items-center gap-4 mb-6 md:mb-8"
+              >
+                {[Cpu, Zap, Layers].map((Icon, i) => (
+                  <motion.div
+                    key={i}
+                    className="p-2 md:p-3 rounded-xl bg-primary/10 border border-primary/20"
+                    animate={{ 
+                      y: [0, -8, 0],
+                      opacity: [0.5, 1, 0.5]
+                    }}
+                    transition={{ duration: 2, delay: i * 0.3, repeat: Infinity }}
+                  >
+                    <Icon className="w-4 h-4 md:w-6 md:h-6 text-primary/70" />
+                  </motion.div>
+                ))}
+              </motion.div>
+
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
-                className="text-center mb-4 md:mb-6"
+                className="text-center mb-6 md:mb-8"
               >
-                <div className="flex items-center justify-center gap-2 md:gap-3 mb-2 md:mb-3">
+                <div className="flex items-center justify-center gap-3 md:gap-4 mb-3 md:mb-4">
                   <motion.div
                     animate={{ 
-                      rotate: [0, 5, -5, 0],
-                      scale: [1, 1.1, 1]
+                      rotate: [0, 10, -10, 0],
+                      scale: [1, 1.15, 1]
                     }}
                     transition={{ duration: 3, repeat: Infinity, repeatDelay: 2 }}
                   >
-                    <Brain className="w-6 h-6 md:w-10 md:h-10 text-primary" />
+                    <Brain className="w-8 h-8 md:w-14 md:h-14 text-primary" />
                   </motion.div>
-                  <h1 className="text-4xl md:text-6xl font-black tracking-tighter">
+                  <h1 className="text-5xl md:text-7xl font-black tracking-tighter">
                     <span className="bg-gradient-to-r from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent">Trans</span>
                     <span className="bg-gradient-to-r from-primary via-primary to-primary/70 bg-clip-text text-transparent">former</span>
                   </h1>
@@ -289,10 +311,23 @@ export default function Exhibition() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ delay: 0.4 }}
-                  className="text-base md:text-xl text-muted-foreground font-light"
+                  className="text-lg md:text-2xl text-muted-foreground font-light"
                 >
                   Watch AI think — <span className="text-foreground font-medium">one token at a time</span>
                 </motion.p>
+
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.6 }}
+                  className="mt-3 flex items-center justify-center gap-3 text-xs md:text-sm text-muted-foreground/60"
+                >
+                  <span className="px-2 py-1 rounded-full bg-muted/30 border border-border/30">Self-Attention</span>
+                  <span className="text-primary/50">+</span>
+                  <span className="px-2 py-1 rounded-full bg-muted/30 border border-border/30">Feed Forward</span>
+                  <span className="text-primary/50">+</span>
+                  <span className="px-2 py-1 rounded-full bg-muted/30 border border-border/30">Probabilities</span>
+                </motion.div>
               </motion.div>
 
               <motion.div
@@ -327,12 +362,12 @@ export default function Exhibition() {
                   ))}
                 </div>
 
-                <div className="flex justify-center">
+                <div className="flex justify-center pt-2">
                   <Button
                     onClick={handleGenerate}
                     disabled={!prompt.trim() || isGenerating}
                     size="lg"
-                    className="text-base md:text-lg px-6 md:px-10 gap-2 shadow-lg shadow-primary/20"
+                    className="text-lg md:text-xl px-8 md:px-14 py-6 md:py-7 gap-3 shadow-xl shadow-primary/30 font-semibold"
                     data-testid="button-generate"
                   >
                     {isGenerating ? (
@@ -341,13 +376,13 @@ export default function Exhibition() {
                           animate={{ rotate: 360 }}
                           transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                         >
-                          <Sparkles className="w-4 h-4 md:w-5 md:h-5" />
+                          <Sparkles className="w-5 h-5 md:w-6 md:h-6" />
                         </motion.div>
                         Processing...
                       </>
                     ) : (
                       <>
-                        <Play className="w-4 h-4 md:w-5 md:h-5" />
+                        <Play className="w-5 h-5 md:w-6 md:h-6" />
                         Generate Response
                       </>
                     )}
