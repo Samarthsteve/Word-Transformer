@@ -416,19 +416,19 @@ export default function Exhibition() {
               initial={{ opacity: 0, y: 50 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              className="flex-1 flex flex-col"
+              className="h-full flex flex-col overflow-hidden"
             >
-              <div className="pt-16 md:pt-20 pb-2 md:pb-4 px-4 md:px-8 text-center">
+              <div className="shrink-0 pt-14 md:pt-16 pb-1 md:pb-2 px-4 md:px-8 text-center">
                 <motion.p
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 0.6 }}
-                  className="text-sm md:text-xl text-muted-foreground max-w-3xl mx-auto font-light italic truncate"
+                  className="text-xs md:text-base text-muted-foreground max-w-3xl mx-auto font-light italic truncate"
                 >
                   "{prompt}"
                 </motion.p>
               </div>
 
-              <div className="flex-1 min-h-0">
+              <div className="flex-1 min-h-0 overflow-hidden">
                 <TransformerPipeline
                   tokens={tokens}
                   currentIndex={currentIndex}
@@ -443,7 +443,7 @@ export default function Exhibition() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3 }}
-                className="px-4 pb-4 md:pb-8 flex flex-col items-center gap-3 md:gap-4"
+                className="shrink-0 px-4 pb-2 md:pb-4 flex flex-col items-center gap-2 md:gap-3"
               >
                 <EducationalAnnotation 
                   state={annotationState}
@@ -451,58 +451,54 @@ export default function Exhibition() {
                   totalTokens={tokens.length}
                 />
 
-                <div className="flex items-center gap-3 md:gap-4 flex-wrap justify-center">
+                <div className="flex items-center gap-2 md:gap-3 flex-wrap justify-center">
                   <Button
                     onClick={handlePrevious}
                     disabled={!canPrevious}
                     variant="outline"
-                    size="lg"
-                    className="gap-2"
+                    className="gap-1.5"
                     data-testid="button-previous"
                   >
-                    <ChevronLeft className="w-4 h-4 md:w-5 md:h-5" />
+                    <ChevronLeft className="w-4 h-4" />
                     Back
                   </Button>
 
                   <Button
                     onClick={handleNext}
                     disabled={!canNext}
-                    size="lg"
-                    className="gap-2 px-6 md:px-8"
+                    className="gap-1.5 px-4 md:px-6"
                     data-testid="button-next"
                   >
                     Next Token
-                    <ChevronRight className="w-4 h-4 md:w-5 md:h-5" />
+                    <ChevronRight className="w-4 h-4" />
                   </Button>
 
                   <Button
                     onClick={handleFastForward}
                     disabled={!canFastForward}
                     variant="secondary"
-                    size="lg"
-                    className="gap-2"
+                    className="gap-1.5"
                     data-testid="button-fast-forward"
                   >
-                    <SkipForward className="w-4 h-4 md:w-5 md:h-5" />
+                    <SkipForward className="w-4 h-4" />
                     Skip All
                   </Button>
 
                   <Button
                     onClick={handleReset}
                     variant="ghost"
-                    size="lg"
-                    className="gap-2"
+                    className="gap-1.5"
                     data-testid="button-reset"
                   >
-                    <RotateCcw className="w-4 h-4 md:w-5 md:h-5" />
+                    <RotateCcw className="w-4 h-4" />
                     Reset
                   </Button>
                 </div>
                 
-                <div className="text-[10px] md:text-xs text-muted-foreground/50 text-center">
-                  <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono mx-0.5">←</kbd> Previous
-                  <span className="mx-2 text-muted-foreground/30">|</span>
-                  <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono mx-0.5">→</kbd> or <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono mx-0.5">Space</kbd> Next
+                <div className="text-[10px] text-muted-foreground/50 text-center">
+                  <kbd className="px-1 py-0.5 bg-muted rounded text-[9px] font-mono mx-0.5">←</kbd> Previous
+                  <span className="mx-1.5 text-muted-foreground/30">|</span>
+                  <kbd className="px-1 py-0.5 bg-muted rounded text-[9px] font-mono mx-0.5">→</kbd> or <kbd className="px-1 py-0.5 bg-muted rounded text-[9px] font-mono mx-0.5">Space</kbd> Next
                 </div>
               </motion.div>
             </motion.div>

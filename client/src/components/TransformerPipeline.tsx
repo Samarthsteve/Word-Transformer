@@ -16,7 +16,7 @@ function TransformerBlock({ isProcessing }: { isProcessing: boolean }) {
   return (
     <div className="relative flex-shrink-0">
       <motion.div
-        className="w-36 h-44 md:w-52 md:h-64 rounded-2xl bg-gradient-to-br from-card via-card/95 to-card/90 border-2 border-primary/30 flex flex-col relative overflow-hidden shadow-2xl"
+        className="w-28 h-36 md:w-40 md:h-48 rounded-xl bg-gradient-to-br from-card via-card/95 to-card/90 border-2 border-primary/30 flex flex-col relative overflow-hidden shadow-xl"
         animate={{
           borderColor: isProcessing 
             ? ["rgba(59, 130, 246, 0.3)", "rgba(59, 130, 246, 0.7)", "rgba(59, 130, 246, 0.3)"]
@@ -183,8 +183,8 @@ export function TransformerPipeline({
     : 1;
 
   return (
-    <div className="w-full h-full flex flex-col">
-      <div className="flex-1 flex items-center justify-center gap-4 md:gap-10 px-4 md:px-8">
+    <div className="w-full h-full flex flex-col overflow-hidden">
+      <div className="flex-1 min-h-0 flex items-center justify-center gap-4 md:gap-8 px-4 md:px-6">
         <div className="flex-1 flex flex-col items-end justify-center pr-2 md:pr-6 min-w-0">
           <motion.div 
             initial={{ opacity: 0 }}
@@ -197,7 +197,7 @@ export function TransformerPipeline({
             </span>
           </motion.div>
           
-          <div className="flex flex-wrap gap-1.5 md:gap-2 justify-end max-w-xs md:max-w-md">
+          <div className="flex flex-wrap gap-1 md:gap-1.5 justify-end max-w-[200px] md:max-w-xs max-h-24 md:max-h-32 overflow-y-auto overflow-x-hidden">
             <AnimatePresence mode="popLayout">
               {visibleTokens.slice(0, -1).map((t, i) => (
                 <motion.span
@@ -206,7 +206,7 @@ export function TransformerPipeline({
                   animate={{ opacity: 0.8, scale: 1, x: 0 }}
                   exit={{ opacity: 0, scale: 0.8, x: -10 }}
                   transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
-                  className="px-2.5 md:px-4 py-1 md:py-2 bg-gradient-to-r from-muted/60 to-muted/40 rounded-lg text-sm md:text-lg font-mono text-foreground/80 border border-border/30 shadow-sm"
+                  className="px-2 md:px-3 py-0.5 md:py-1 bg-gradient-to-r from-muted/60 to-muted/40 rounded-md text-xs md:text-sm font-mono text-foreground/80 border border-border/30 shadow-sm"
                   data-testid={`context-token-${i}`}
                 >
                   {t.token}
@@ -221,10 +221,10 @@ export function TransformerPipeline({
               initial={{ opacity: 0, x: -30, scale: 0.9 }}
               animate={{ opacity: 1, x: 0, scale: 1 }}
               transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
-              className="mt-4 md:mt-6"
+              className="mt-2 md:mt-4"
             >
               <motion.div 
-                className="px-4 md:px-8 py-2 md:py-4 bg-gradient-to-r from-primary/25 to-primary/15 border-2 border-primary/50 rounded-xl text-lg md:text-3xl font-mono text-primary font-bold shadow-xl shadow-primary/20"
+                className="px-3 md:px-5 py-1.5 md:py-2.5 bg-gradient-to-r from-primary/25 to-primary/15 border-2 border-primary/50 rounded-lg text-base md:text-2xl font-mono text-primary font-bold shadow-lg shadow-primary/20"
                 animate={isProcessing ? { 
                   boxShadow: ["0 0 25px rgba(59, 130, 246, 0.3)", "0 0 50px rgba(59, 130, 246, 0.5)", "0 0 25px rgba(59, 130, 246, 0.3)"],
                   borderColor: ["rgba(59, 130, 246, 0.5)", "rgba(59, 130, 246, 0.8)", "rgba(59, 130, 246, 0.5)"]
@@ -268,7 +268,7 @@ export function TransformerPipeline({
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
                 transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
-                className="w-full max-w-xs md:max-w-md space-y-2 md:space-y-3"
+                className="w-full max-w-[220px] md:max-w-xs space-y-1.5 md:space-y-2"
               >
                 {allTokens.map((item, index) => {
                   const isChosen = item.token === chosenToken;
@@ -282,7 +282,7 @@ export function TransformerPipeline({
                       initial={{ opacity: 0, x: 30 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: index * 0.06, duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
-                      className={`group flex items-center gap-2 md:gap-4 p-2 md:p-3 rounded-xl transition-all duration-300 ${
+                      className={`group flex items-center gap-2 md:gap-3 p-1.5 md:p-2 rounded-lg transition-all duration-300 ${
                         isClickable 
                           ? "cursor-pointer hover:bg-muted/50 hover:scale-[1.02] hover:shadow-lg" 
                           : ""
@@ -291,15 +291,15 @@ export function TransformerPipeline({
                       whileHover={isClickable ? { x: 6 } : {}}
                       data-testid={`pipeline-bar-${index}`}
                     >
-                      <div className="w-16 md:w-24 text-right shrink-0">
-                        <span className={`font-mono text-sm md:text-base truncate block ${
+                      <div className="w-12 md:w-16 text-right shrink-0">
+                        <span className={`font-mono text-xs md:text-sm truncate block ${
                           isChosen ? "text-primary font-bold" : "text-foreground/70 group-hover:text-foreground"
                         }`}>
                           {item.token}
                         </span>
                       </div>
                       
-                      <div className="flex-1 h-7 md:h-10 bg-muted/30 rounded-lg overflow-hidden relative border border-border/20">
+                      <div className="flex-1 h-5 md:h-7 bg-muted/30 rounded-md overflow-hidden relative border border-border/20">
                         <motion.div
                           initial={{ width: 0 }}
                           animate={{ width: `${barWidth}%` }}
@@ -324,12 +324,12 @@ export function TransformerPipeline({
                         )}
                       </div>
 
-                      <div className="w-12 md:w-16 text-right shrink-0">
+                      <div className="w-10 md:w-12 text-right shrink-0">
                         <motion.span
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
                           transition={{ delay: index * 0.06 + 0.25 }}
-                          className={`font-mono text-xs md:text-sm ${
+                          className={`font-mono text-[10px] md:text-xs ${
                             isChosen ? "text-primary font-bold" : "text-muted-foreground"
                           }`}
                         >
@@ -369,24 +369,24 @@ export function TransformerPipeline({
                   <span>Computing attention & probabilities...</span>
                 </div>
 
-                <div className="w-full max-w-xs md:max-w-md space-y-2">
+                <div className="w-full max-w-xs md:max-w-sm space-y-1.5">
                   {[0.85, 0.55, 0.35, 0.2, 0.1].map((width, i) => (
                     <motion.div
                       key={i}
-                      className="flex items-center gap-3 p-2 rounded-lg bg-muted/10"
+                      className="flex items-center gap-2 p-1.5 rounded-md bg-muted/10"
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 0.4 }}
                       transition={{ delay: i * 0.1 }}
                     >
-                      <div className="w-16 md:w-24 h-4 bg-muted/40 rounded animate-pulse" />
-                      <div className="flex-1 h-7 md:h-10 bg-muted/20 rounded-lg overflow-hidden">
+                      <div className="w-12 md:w-16 h-3 bg-muted/40 rounded animate-pulse" />
+                      <div className="flex-1 h-5 md:h-6 bg-muted/20 rounded-md overflow-hidden">
                         <motion.div
-                          className="h-full bg-muted/40 rounded-lg"
+                          className="h-full bg-muted/40 rounded-md"
                           animate={{ width: [`${width * 40}%`, `${width * 100}%`, `${width * 40}%`] }}
                           transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
                         />
                       </div>
-                      <div className="w-12 md:w-16 h-4 bg-muted/40 rounded animate-pulse" />
+                      <div className="w-10 md:w-12 h-3 bg-muted/40 rounded animate-pulse" />
                     </motion.div>
                   ))}
                 </div>
@@ -432,13 +432,13 @@ export function TransformerPipeline({
         </div>
       </div>
 
-      <div className="flex justify-center pb-4 md:pb-8">
+      <div className="shrink-0 flex justify-center py-2 md:py-3">
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="p-3 md:p-4 rounded-2xl bg-gradient-to-r from-card/80 via-card to-card/80 backdrop-blur-md border border-border/50 shadow-xl"
+          className="p-2 md:p-3 rounded-xl bg-gradient-to-r from-card/80 via-card to-card/80 backdrop-blur-md border border-border/50 shadow-lg max-w-[90vw] overflow-x-auto"
         >
-          <div className="flex flex-wrap gap-1.5 md:gap-3 justify-center max-w-4xl">
+          <div className="flex flex-wrap gap-1 md:gap-2 justify-center max-w-4xl">
             <AnimatePresence mode="popLayout">
               {visibleTokens.map((t, i) => {
                 const isCurrentToken = i === currentIndex;
@@ -456,10 +456,10 @@ export function TransformerPipeline({
                     }}
                     exit={{ opacity: 0, y: -20, scale: 0.8 }}
                     transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
-                    className={`px-3 md:px-5 py-1.5 md:py-2.5 rounded-lg font-mono ${
+                    className={`px-2 md:px-3 py-1 md:py-1.5 rounded-md font-mono ${
                       isCurrentToken 
-                        ? "text-xl md:text-3xl font-bold text-primary bg-primary/15 border-2 border-primary/40 shadow-lg shadow-primary/15" 
-                        : "text-lg md:text-2xl text-foreground/75 bg-muted/30 border border-border/30"
+                        ? "text-base md:text-xl font-bold text-primary bg-primary/15 border-2 border-primary/40 shadow-md shadow-primary/15" 
+                        : "text-sm md:text-lg text-foreground/75 bg-muted/30 border border-border/30"
                     }`}
                     data-testid={`output-token-${i}`}
                   >

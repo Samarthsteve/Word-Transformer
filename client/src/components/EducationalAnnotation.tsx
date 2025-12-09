@@ -75,14 +75,14 @@ export function EducationalAnnotation({ state, currentTokenIndex, totalTokens }:
     <AnimatePresence mode="wait">
       <motion.div
         key={state}
-        initial={{ opacity: 0, y: 20, scale: 0.98 }}
+        initial={{ opacity: 0, y: 10, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: -20, scale: 0.98 }}
-        transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
-        className="w-full max-w-3xl mx-auto"
+        exit={{ opacity: 0, y: -10, scale: 0.98 }}
+        transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+        className="w-full max-w-2xl mx-auto"
       >
         <motion.div 
-          className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-card/95 via-card/90 to-card/80 backdrop-blur-md border border-border/60 shadow-2xl"
+          className="relative overflow-hidden rounded-xl bg-gradient-to-br from-card/95 via-card/90 to-card/80 backdrop-blur-md border border-border/60 shadow-lg"
           animate={{
             borderColor: state === "generating" || state === "regenerating" 
               ? ["rgba(var(--primary), 0.3)", "rgba(var(--primary), 0.6)", "rgba(var(--primary), 0.3)"]
@@ -96,16 +96,16 @@ export function EducationalAnnotation({ state, currentTokenIndex, totalTokens }:
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
-              className="absolute top-0 left-0 px-4 py-1.5 bg-primary/20 text-primary text-[10px] md:text-xs font-bold uppercase tracking-wider rounded-br-xl"
+              className="absolute top-0 left-0 px-2 py-0.5 bg-primary/20 text-primary text-[9px] md:text-[10px] font-bold uppercase tracking-wider rounded-br-lg"
             >
               {annotation.step}
             </motion.div>
           )}
 
-          <div className="relative p-4 md:p-6">
-            <div className="flex items-start gap-4 md:gap-5">
+          <div className="relative p-3 md:p-4">
+            <div className="flex items-start gap-3">
               <motion.div 
-                className="shrink-0 p-2.5 md:p-3 rounded-xl bg-gradient-to-br from-background to-muted/50 border border-border/50 shadow-inner"
+                className="shrink-0 p-2 rounded-lg bg-gradient-to-br from-background to-muted/50 border border-border/50 shadow-inner"
                 animate={state === "generating" || state === "regenerating" ? { 
                   rotate: [0, 360],
                   scale: [1, 1.05, 1]
@@ -117,64 +117,41 @@ export function EducationalAnnotation({ state, currentTokenIndex, totalTokens }:
                   scale: { duration: 2, repeat: Infinity, ease: "easeInOut" }
                 }}
               >
-                <Icon className={`w-6 h-6 md:w-8 md:h-8 ${annotation.color}`} />
+                <Icon className={`w-5 h-5 md:w-6 md:h-6 ${annotation.color}`} />
               </motion.div>
               
-              <div className="space-y-2 md:space-y-3 min-w-0 flex-1">
+              <div className="space-y-1 md:space-y-1.5 min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h4 className="font-bold text-base md:text-lg text-foreground tracking-tight">
+                  <h4 className="font-bold text-sm md:text-base text-foreground tracking-tight">
                     {annotation.title}
                   </h4>
                   {(state === "generating" || state === "regenerating") && (
                     <motion.div
                       animate={{ opacity: [0.5, 1, 0.5] }}
                       transition={{ duration: 1.5, repeat: Infinity }}
-                      className="flex items-center gap-1 px-2 py-0.5 bg-primary/20 rounded-full"
+                      className="flex items-center gap-1 px-1.5 py-0.5 bg-primary/20 rounded-full"
                     >
-                      <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                      <span className="text-[10px] md:text-xs text-primary font-medium">Processing</span>
+                      <div className="w-1 h-1 rounded-full bg-primary animate-pulse" />
+                      <span className="text-[9px] md:text-[10px] text-primary font-medium">Processing</span>
                     </motion.div>
+                  )}
+                  {(state === "revealing" || state === "showing-probabilities") && totalTokens > 0 && (
+                    <span className="text-[10px] md:text-xs text-muted-foreground font-mono">
+                      Token {currentTokenIndex + 1}/{totalTokens}
+                    </span>
                   )}
                 </div>
                 
-                <p className="text-sm md:text-base text-foreground/80 leading-relaxed">
+                <p className="text-xs md:text-sm text-foreground/80 leading-relaxed line-clamp-2">
                   {annotation.description}
                 </p>
                 
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  transition={{ delay: 0.3, duration: 0.4 }}
-                  className="pt-2 md:pt-3 border-t border-border/30"
-                >
-                  <div className="flex items-start gap-2">
-                    <ArrowRight className="w-3 h-3 md:w-4 md:h-4 text-muted-foreground shrink-0 mt-0.5" />
-                    <p className="text-xs md:text-sm text-muted-foreground italic leading-relaxed">
-                      {annotation.technicalDetail}
-                    </p>
-                  </div>
-                </motion.div>
-                
-                {(state === "revealing" || state === "showing-probabilities") && totalTokens > 0 && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.4 }}
-                    className="flex items-center gap-3 pt-2"
-                  >
-                    <div className="flex-1 max-w-48 h-2 bg-muted/50 rounded-full overflow-hidden border border-border/30">
-                      <motion.div
-                        className="h-full bg-gradient-to-r from-primary to-primary/70 rounded-full"
-                        initial={{ width: 0 }}
-                        animate={{ width: `${((currentTokenIndex + 1) / totalTokens) * 100}%` }}
-                        transition={{ duration: 0.5, ease: "easeOut" }}
-                      />
-                    </div>
-                    <span className="text-xs md:text-sm text-muted-foreground font-mono font-medium">
-                      Token {currentTokenIndex + 1} of {totalTokens}
-                    </span>
-                  </motion.div>
-                )}
+                <div className="flex items-start gap-1.5 pt-1 border-t border-border/30">
+                  <ArrowRight className="w-3 h-3 text-muted-foreground shrink-0 mt-0.5" />
+                  <p className="text-[10px] md:text-xs text-muted-foreground italic leading-relaxed line-clamp-1">
+                    {annotation.technicalDetail}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
