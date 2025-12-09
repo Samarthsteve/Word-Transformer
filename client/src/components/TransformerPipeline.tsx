@@ -16,7 +16,7 @@ function TransformerBlock({ isProcessing }: { isProcessing: boolean }) {
   return (
     <div className="relative flex-shrink-0">
       <motion.div
-        className="w-28 h-36 md:w-40 md:h-48 rounded-xl bg-gradient-to-br from-card via-card/95 to-card/90 border-2 border-primary/30 flex flex-col relative overflow-hidden shadow-xl"
+        className="w-32 h-40 md:w-44 md:h-52 rounded-xl bg-gradient-to-br from-card via-card/95 to-card/90 border-2 border-primary/30 flex flex-col relative overflow-hidden shadow-xl"
         animate={{
           borderColor: isProcessing 
             ? ["rgba(59, 130, 246, 0.3)", "rgba(59, 130, 246, 0.7)", "rgba(59, 130, 246, 0.3)"]
@@ -177,7 +177,7 @@ export function TransformerPipeline({
   const combinedTokens = [chosenEntry, ...alternatives.filter(a => a.token.toLowerCase() !== chosenToken.toLowerCase())];
   const allTokens = combinedTokens
     .sort((a, b) => b.probability - a.probability)
-    .slice(0, 5);
+    .slice(0, 4);
   const maxProbability = allTokens.length > 0 
     ? Math.max(...allTokens.map((t) => t.probability), 0.01) 
     : 1;
@@ -197,7 +197,7 @@ export function TransformerPipeline({
             </span>
           </motion.div>
           
-          <div className="flex flex-wrap gap-1 md:gap-1.5 justify-end max-w-[200px] md:max-w-xs max-h-24 md:max-h-32 overflow-y-auto overflow-x-hidden">
+          <div className="flex flex-wrap gap-1.5 md:gap-2 justify-end max-w-[180px] md:max-w-[240px] max-h-20 md:max-h-28 overflow-y-auto overflow-x-hidden">
             <AnimatePresence mode="popLayout">
               {visibleTokens.slice(0, -1).map((t, i) => (
                 <motion.span
@@ -268,7 +268,7 @@ export function TransformerPipeline({
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
                 transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
-                className="w-full max-w-[220px] md:max-w-xs space-y-1.5 md:space-y-2"
+                className="w-full max-w-[200px] md:max-w-[280px] space-y-2 md:space-y-2.5"
               >
                 {allTokens.map((item, index) => {
                   const isChosen = item.token === chosenToken;
@@ -282,7 +282,7 @@ export function TransformerPipeline({
                       initial={{ opacity: 0, x: 30 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: index * 0.06, duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
-                      className={`group flex items-center gap-2 md:gap-3 p-1.5 md:p-2 rounded-lg transition-all duration-300 ${
+                      className={`group flex items-center gap-2 md:gap-3 p-2 md:p-2.5 rounded-lg transition-all duration-300 ${
                         isClickable 
                           ? "cursor-pointer hover:bg-muted/50 hover:scale-[1.02] hover:shadow-lg" 
                           : ""
@@ -299,7 +299,7 @@ export function TransformerPipeline({
                         </span>
                       </div>
                       
-                      <div className="flex-1 h-5 md:h-7 bg-muted/30 rounded-md overflow-hidden relative border border-border/20">
+                      <div className="flex-1 h-6 md:h-8 bg-muted/30 rounded-md overflow-hidden relative border border-border/20">
                         <motion.div
                           initial={{ width: 0 }}
                           animate={{ width: `${barWidth}%` }}
@@ -370,7 +370,7 @@ export function TransformerPipeline({
                 </div>
 
                 <div className="w-full max-w-xs md:max-w-sm space-y-1.5">
-                  {[0.85, 0.55, 0.35, 0.2, 0.1].map((width, i) => (
+                  {[0.85, 0.55, 0.35, 0.2].map((width, i) => (
                     <motion.div
                       key={i}
                       className="flex items-center gap-2 p-1.5 rounded-md bg-muted/10"
