@@ -193,6 +193,31 @@ CRITICAL RULES:
   return tokens;
 }
 
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  baseDelay: number = 1000
+): Promise<T> {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      const isRetryable = error?.status === 503 || error?.status === 429 || 
+                          error?.message?.includes("overloaded") ||
+                          error?.message?.includes("UNAVAILABLE");
+      
+      if (!isRetryable || attempt === maxRetries - 1) {
+        throw error;
+      }
+      
+      const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 500;
+      console.log(`Gemini API temporarily unavailable, retrying in ${Math.round(delay)}ms (attempt ${attempt + 1}/${maxRetries})`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  throw new Error("Max retries exceeded");
+}
+
 async function generateWithGemini(prompt: string): Promise<GeneratedToken[]> {
   const systemPrompt = `You are a text completion engine that simulates how a language model generates text with probability distributions.
 
@@ -233,14 +258,16 @@ CRITICAL RULES:
 5. Each token must have 4-5 alternatives with decreasing probabilities
 6. VARY the probabilities - avoid patterns like always using 0.25, 0.15, 0.10, 0.05`;
 
-  const response = await gemini.models.generateContent({
-    model: "gemini-2.5-flash",
-    config: {
-      systemInstruction: systemPrompt,
-      responseMimeType: "application/json",
-    },
-    contents: `Continue this text with probability analysis: "${prompt}"`,
-  });
+  const response = await retryWithBackoff(() => 
+    gemini.models.generateContent({
+      model: "gemini-2.5-flash",
+      config: {
+        systemInstruction: systemPrompt,
+        responseMimeType: "application/json",
+      },
+      contents: `Continue this text with probability analysis: "${prompt}"`,
+    })
+  );
 
   let responseText = response.text || "";
   
@@ -307,13 +334,15 @@ CRITICAL RULES:
 4. Generate 8-15 additional words that naturally continue the text
 5. Return ONLY the continuation, nothing else`;
 
-  const response = await gemini.models.generateContent({
-    model: "gemini-2.5-flash",
-    config: {
-      systemInstruction: systemPrompt,
-    },
-    contents: `Continue this text (do NOT repeat it, only add new words): "${prompt}"`,
-  });
+  const response = await retryWithBackoff(() =>
+    gemini.models.generateContent({
+      model: "gemini-2.5-flash",
+      config: {
+        systemInstruction: systemPrompt,
+      },
+      contents: `Continue this text (do NOT repeat it, only add new words): "${prompt}"`,
+    })
+  );
 
   let text = response.text || "";
   
@@ -348,13 +377,15 @@ Provide 4 alternative words for each that could replace it in context. Return JS
 }`;
 
   try {
-    const altResponse = await gemini.models.generateContent({
-      model: "gemini-2.5-flash",
-      config: {
-        responseMimeType: "application/json",
-      },
-      contents: alternativesPrompt,
-    });
+    const altResponse = await retryWithBackoff(() =>
+      gemini.models.generateContent({
+        model: "gemini-2.5-flash",
+        config: {
+          responseMimeType: "application/json",
+        },
+        contents: alternativesPrompt,
+      })
+    );
 
     const altText = (altResponse.text || "").replace(/```json\n?|\n?```/g, "").trim();
     const altParsed = JSON.parse(altText);
