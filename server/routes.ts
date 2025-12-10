@@ -194,22 +194,31 @@ CRITICAL RULES:
 }
 
 async function generateWithGemini(prompt: string): Promise<GeneratedToken[]> {
-  const systemPrompt = `You are a text completion engine that provides detailed probability analysis.
+  const systemPrompt = `You are a text completion engine that simulates how a language model generates text with probability distributions.
 
 Your task is to:
 1. Continue the given text naturally with 8-15 words
-2. For EACH word you generate, provide 4-5 alternative words that could also fit in that position with estimated probability scores
+2. For EACH word you generate, provide 4-5 alternative words with REALISTIC and VARIED probability scores
+
+IMPORTANT - Probability Guidelines:
+- The CHOSEN word should typically have probability between 0.25-0.65 (varies per word)
+- Some words are highly predictable (probability 0.7-0.85) like "the" after "in"
+- Other words are less certain (probability 0.15-0.35)
+- Alternatives should have DECREASING probabilities that sum to less than the remaining probability
+- Make probabilities REALISTIC and VARIED - do NOT use round numbers like 0.15, 0.25, 0.35
+- Use precise values like 0.47, 0.23, 0.18, 0.09, 0.03 or 0.62, 0.19, 0.11, 0.05, 0.03
 
 Return a JSON object with this EXACT structure:
 {
   "tokens": [
     {
       "chosen": "word1",
+      "chosenProbability": 0.47,
       "alternatives": [
-        {"token": "alt1", "probability": 0.25},
-        {"token": "alt2", "probability": 0.15},
-        {"token": "alt3", "probability": 0.10},
-        {"token": "alt4", "probability": 0.05}
+        {"token": "alt1", "probability": 0.23},
+        {"token": "alt2", "probability": 0.14},
+        {"token": "alt3", "probability": 0.09},
+        {"token": "alt4", "probability": 0.04}
       ]
     },
     ...more tokens
@@ -219,9 +228,10 @@ Return a JSON object with this EXACT structure:
 CRITICAL RULES:
 1. Do NOT repeat any part of the user's input text
 2. Only output the JSON, nothing else
-3. Probabilities should be realistic (highest around 0.3-0.5, lower ones decreasing)
+3. Each word's chosenProbability should VARY based on context (some words are more predictable than others)
 4. Alternatives should be contextually appropriate words that could replace the chosen word
-5. Each token must have 4-5 alternatives with decreasing probabilities`;
+5. Each token must have 4-5 alternatives with decreasing probabilities
+6. VARY the probabilities - avoid patterns like always using 0.25, 0.15, 0.10, 0.05`;
 
   const response = await gemini.models.generateContent({
     model: "gemini-2.5-flash",
@@ -265,8 +275,8 @@ CRITICAL RULES:
           const chosenProb = tokenData.chosenProbability 
             ? Math.min(Math.max(tokenData.chosenProbability, 0), 1)
             : alternatives.length > 0 
-              ? Math.min(alternatives[0].probability + 0.2, 0.95)
-              : 0.75;
+              ? Math.min(alternatives[0].probability * (1.3 + Math.random() * 0.5), 0.95)
+              : 0.45 + Math.random() * 0.35;
           
           tokens.push({
             token: tokenData.chosen,
@@ -368,8 +378,8 @@ Provide 4 alternative words for each that could replace it in context. Return JS
         
         const sortedAlts = alternatives.slice(0, 5).sort((a, b) => b.probability - a.probability);
         const chosenProb = sortedAlts.length > 0 
-          ? Math.min(sortedAlts[0].probability + 0.2, 0.95)
-          : 0.75;
+          ? Math.min(sortedAlts[0].probability * (1.2 + Math.random() * 0.6), 0.95)
+          : 0.35 + Math.random() * 0.45;
         
         return {
           token: word,
@@ -387,7 +397,7 @@ Provide 4 alternative words for each that could replace it in context. Return JS
   const tokens: GeneratedToken[] = continuationWords.map((word) => ({
     token: word,
     alternatives: [],
-    chosenProbability: 0.75,
+    chosenProbability: 0.4 + Math.random() * 0.4,
   }));
 
   return tokens;

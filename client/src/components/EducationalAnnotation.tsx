@@ -18,7 +18,7 @@ type AnnotationContent = {
 
 const annotations: Record<AnnotationState, AnnotationContent> = {
   idle: {
-    title: "Welcome to Transformer Exhibition",
+    title: "Welcome to GSV AI Exhibition",
     subtitle: "The AI architecture behind ChatGPT & Gemini",
     icon: Lightbulb,
     color: "text-amber-500",

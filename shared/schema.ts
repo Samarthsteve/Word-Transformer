@@ -45,9 +45,9 @@ export type RegenerateRequest = z.infer<typeof regenerateRequestSchema>;
 
 // Preset prompts for exhibition
 export const presetPrompts = [
-  "Once upon a time, in a land far away",
-  "The secret to happiness is",
-  "In the year 2050, technology will",
-  "The most important invention in human history was",
-  "If I could travel anywhere, I would go to",
+  "In the historic city of Bidar, Karnataka, the ancient fort",
+  "The transformer architecture works by",
+  "Artificial intelligence helps students learn by",
+  "The future of education will be shaped by",
+  "When machines understand language, they can",
 ];

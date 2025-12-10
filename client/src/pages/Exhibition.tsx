@@ -3,11 +3,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import type { GeneratedToken, GenerateResponse, RegenerateRequest } from "@shared/schema";
-import { Sparkles, Play, SkipForward, RotateCcw, ChevronRight, ChevronLeft, Info, Layers, Brain, Cpu, Zap } from "lucide-react";
+import { Sparkles, SkipForward, RotateCcw, ChevronRight, ChevronLeft, Layers, Brain, Cpu, Zap, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { TransformerPipeline } from "@/components/TransformerPipeline";
-import { ModelSelector } from "@/components/ModelSelector";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { EducationalAnnotation } from "@/components/EducationalAnnotation";
 import { AmbientParticles } from "@/components/AmbientParticles";
@@ -16,7 +15,7 @@ import { presetPrompts } from "@shared/schema";
 type AnnotationState = "idle" | "generating" | "revealing" | "showing-probabilities" | "complete" | "regenerating";
 
 export default function Exhibition() {
-  const [selectedModel, setSelectedModel] = useState<"gemini" | "openai">("gemini");
+  const selectedModel = "gemini" as const;
   const [prompt, setPrompt] = useState("");
   const [tokens, setTokens] = useState<GeneratedToken[]>([]);
   const [currentIndex, setCurrentIndex] = useState(-1);
@@ -236,21 +235,24 @@ export default function Exhibition() {
         <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-card/60 backdrop-blur-md border border-border/50"
+          whileHover={{ scale: 1.02 }}
+          className="flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-card/80 to-card/60 backdrop-blur-md border border-primary/30 shadow-lg shadow-primary/10"
         >
-          <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-          <span className="text-[10px] md:text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            AI Exhibition
+          <motion.div 
+            className="w-2.5 h-2.5 rounded-full bg-green-500"
+            animate={{ 
+              scale: [1, 1.2, 1],
+              opacity: [1, 0.7, 1]
+            }}
+            transition={{ duration: 2, repeat: Infinity }}
+          />
+          <span className="text-[10px] md:text-xs font-semibold text-foreground/90 uppercase tracking-wider">
+            GSV AI Exhibition
           </span>
         </motion.div>
       </div>
 
       <div className="absolute top-4 right-4 md:top-6 md:right-6 z-50 flex items-center gap-2 md:gap-3">
-        <ModelSelector
-          selectedModel={selectedModel}
-          onModelChange={setSelectedModel}
-          disabled={isGenerating || hasTokens}
-        />
         <ThemeToggle />
       </div>
 
@@ -319,14 +321,34 @@ export default function Exhibition() {
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  transition={{ delay: 0.6 }}
-                  className="mt-3 flex items-center justify-center gap-3 text-xs md:text-sm text-muted-foreground/60"
+                  transition={{ delay: 0.5 }}
+                  className="mt-4 max-w-lg mx-auto text-sm text-muted-foreground/70 leading-relaxed"
                 >
-                  <span className="px-2 py-1 rounded-full bg-muted/30 border border-border/30">Self-Attention</span>
-                  <span className="text-primary/50">+</span>
-                  <span className="px-2 py-1 rounded-full bg-muted/30 border border-border/30">Feed Forward</span>
-                  <span className="text-primary/50">+</span>
-                  <span className="px-2 py-1 rounded-full bg-muted/30 border border-border/30">Probabilities</span>
+                  Discover how AI models like ChatGPT & Gemini generate text by predicting the next word with probabilities
+                </motion.div>
+
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.6 }}
+                  className="mt-4 flex items-center justify-center gap-2 md:gap-3 flex-wrap text-xs md:text-sm text-muted-foreground/60"
+                >
+                  {[
+                    { label: "Self-Attention", delay: 0 },
+                    { label: "Feed Forward", delay: 0.1 },
+                    { label: "Probabilities", delay: 0.2 }
+                  ].map((item, i) => (
+                    <motion.span
+                      key={item.label}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.7 + item.delay }}
+                      whileHover={{ scale: 1.05, borderColor: "hsl(var(--primary))" }}
+                      className="px-3 py-1.5 rounded-full bg-muted/30 border border-border/30 cursor-default transition-colors"
+                    >
+                      {item.label}
+                    </motion.span>
+                  ))}
                 </motion.div>
               </motion.div>
 
@@ -348,45 +370,61 @@ export default function Exhibition() {
                 </div>
 
                 <div className="flex flex-wrap gap-2 justify-center">
-                  {presetPrompts.slice(0, 3).map((preset, index) => (
-                    <Button
+                  {presetPrompts.map((preset, index) => (
+                    <motion.div
                       key={index}
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setPrompt(preset)}
-                      className="text-[10px] md:text-xs bg-card/40 border-muted-foreground/20 hover:border-primary/50 hover:bg-primary/10"
-                      data-testid={`button-preset-${index}`}
+                      whileHover={{ scale: 1.03, y: -2 }}
+                      whileTap={{ scale: 0.97 }}
+                      transition={{ type: "spring", stiffness: 400, damping: 17 }}
                     >
-                      {preset.length > 30 ? preset.slice(0, 30) + "..." : preset}
-                    </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPrompt(preset)}
+                        className="text-[10px] md:text-xs bg-card/50 border-muted-foreground/20 hover:border-primary/50 hover:bg-primary/5 hover:text-primary transition-colors duration-200 rounded-full px-4"
+                        data-testid={`button-preset-${index}`}
+                      >
+                        {preset.length > 35 ? preset.slice(0, 35) + "..." : preset}
+                      </Button>
+                    </motion.div>
                   ))}
                 </div>
 
-                <div className="flex justify-center pt-2">
-                  <Button
-                    onClick={handleGenerate}
-                    disabled={!prompt.trim() || isGenerating}
-                    size="lg"
-                    className="text-lg md:text-xl px-8 md:px-14 py-6 md:py-7 gap-3 shadow-xl shadow-primary/30 font-semibold"
-                    data-testid="button-generate"
+                <div className="flex justify-center pt-4">
+                  <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
                   >
-                    {isGenerating ? (
-                      <>
-                        <motion.div
-                          animate={{ rotate: 360 }}
-                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                        >
-                          <Sparkles className="w-5 h-5 md:w-6 md:h-6" />
-                        </motion.div>
-                        Processing...
-                      </>
-                    ) : (
-                      <>
-                        <Play className="w-5 h-5 md:w-6 md:h-6" />
-                        Generate Response
-                      </>
-                    )}
-                  </Button>
+                    <Button
+                      onClick={handleGenerate}
+                      disabled={!prompt.trim() || isGenerating}
+                      className="relative group px-8 py-3 text-base font-medium gap-2.5 rounded-full bg-gradient-to-r from-primary via-primary to-primary/90 hover:from-primary/90 hover:to-primary shadow-lg shadow-primary/25 transition-all duration-300"
+                      data-testid="button-generate"
+                    >
+                      <motion.div
+                        className="absolute inset-0 rounded-full bg-gradient-to-r from-primary/0 via-white/20 to-primary/0"
+                        animate={{ x: ["-100%", "100%"] }}
+                        transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                        style={{ opacity: isGenerating ? 0.5 : 0 }}
+                      />
+                      {isGenerating ? (
+                        <>
+                          <motion.div
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                          >
+                            <Sparkles className="w-4 h-4" />
+                          </motion.div>
+                          <span>Analyzing...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Wand2 className="w-4 h-4" />
+                          <span>Generate</span>
+                        </>
+                      )}
+                    </Button>
+                  </motion.div>
                 </div>
               </motion.div>
             </motion.div>
