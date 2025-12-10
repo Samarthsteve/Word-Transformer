@@ -21,11 +21,15 @@ type GeneratedToken = {
   chosenProbability: number;
 };
 
-const gemini = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+function getGeminiClient() {
+  return new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+}
 
-const openai = process.env.OPENAI_API_KEY 
-  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  : null;
+function getOpenAIClient() {
+  return process.env.OPENAI_API_KEY 
+    ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+    : null;
+}
 
 function logProbToProb(logProb: number): number {
   return Math.min(Math.max(Math.exp(logProb), 0), 1);
@@ -92,6 +96,7 @@ function aggregateLogprobsToWords(
 }
 
 async function generateWithOpenAI(prompt: string): Promise<GeneratedToken[]> {
+  const openai = getOpenAIClient();
   if (!openai) {
     throw new Error("OpenAI API key not configured");
   }
@@ -232,6 +237,8 @@ async function retryWithBackoff<T>(
 }
 
 async function generateWithGemini(prompt: string): Promise<GeneratedToken[]> {
+  const gemini = getGeminiClient();
+  
   const systemPrompt = `You are a text completion engine that simulates how a language model generates text with probability distributions.
 
 Your task is to:
@@ -338,6 +345,8 @@ CRITICAL RULES:
 }
 
 async function generateWithGeminiFallback(prompt: string): Promise<GeneratedToken[]> {
+  const gemini = getGeminiClient();
+  
   const systemPrompt = `You are a text completion engine. Your ONLY job is to continue the text that the user provides.
 
 CRITICAL RULES:
@@ -386,6 +395,104 @@ CRITICAL RULES:
   return tokens;
 }
 
+async function handleGenerate(req: VercelRequest, res: VercelResponse) {
+  try {
+    const parseResult = generateRequestSchema.safeParse(req.body);
+    
+    if (!parseResult.success) {
+      return res.status(400).json({ 
+        error: "Invalid request", 
+        details: parseResult.error.errors 
+      });
+    }
+
+    const { prompt, model } = parseResult.data;
+
+    let tokens: GeneratedToken[];
+
+    if (model === "openai") {
+      if (!process.env.OPENAI_API_KEY) {
+        return res.status(400).json({ 
+          error: "OpenAI API key not configured. Please use Gemini or add an OpenAI API key." 
+        });
+      }
+      tokens = await generateWithOpenAI(prompt);
+    } else {
+      if (!process.env.GEMINI_API_KEY) {
+        return res.status(400).json({ 
+          error: "Gemini API key not configured." 
+        });
+      }
+      tokens = await generateWithGemini(prompt);
+    }
+
+    return res.status(200).json({ 
+      tokens, 
+      model: model === "openai" ? "GPT-4o" : "Gemini 2.5 Flash" 
+    });
+  } catch (error) {
+    console.error("Generation error:", error);
+    return res.status(500).json({ 
+      error: "Failed to generate response",
+      details: error instanceof Error ? error.message : "Unknown error"
+    });
+  }
+}
+
+async function handleRegenerate(req: VercelRequest, res: VercelResponse) {
+  try {
+    const parseResult = regenerateRequestSchema.safeParse(req.body);
+    
+    if (!parseResult.success) {
+      return res.status(400).json({ 
+        error: "Invalid request", 
+        details: parseResult.error.errors 
+      });
+    }
+
+    const { originalPrompt, tokensBeforeChange, newToken, model } = parseResult.data;
+    
+    const newPrompt = [originalPrompt, ...tokensBeforeChange, newToken].join(" ");
+
+    let tokens: GeneratedToken[];
+
+    if (model === "openai") {
+      if (!process.env.OPENAI_API_KEY) {
+        return res.status(400).json({ 
+          error: "OpenAI API key not configured" 
+        });
+      }
+      tokens = await generateWithOpenAI(newPrompt);
+    } else {
+      if (!process.env.GEMINI_API_KEY) {
+        return res.status(400).json({ 
+          error: "Gemini API key not configured" 
+        });
+      }
+      tokens = await generateWithGemini(newPrompt);
+    }
+
+    return res.status(200).json({ 
+      tokens, 
+      model: model === "openai" ? "GPT-4o" : "Gemini 2.5 Flash" 
+    });
+  } catch (error) {
+    console.error("Regeneration error:", error);
+    return res.status(500).json({ 
+      error: "Failed to regenerate response",
+      details: error instanceof Error ? error.message : "Unknown error"
+    });
+  }
+}
+
+function handleHealth(res: VercelResponse) {
+  return res.status(200).json({ 
+    status: "ok",
+    geminiConfigured: !!process.env.GEMINI_API_KEY,
+    openaiConfigured: !!process.env.OPENAI_API_KEY,
+  });
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -395,104 +502,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).end();
   }
 
-  const path = req.url?.replace(/^\/api\/?/, '') || '';
-
-  if (req.method === 'GET' && (path === '' || path === 'health')) {
-    return res.json({ 
-      status: "ok",
-      geminiConfigured: !!process.env.GEMINI_API_KEY,
-      openaiConfigured: !!process.env.OPENAI_API_KEY,
-    });
+  const url = req.url || '';
+  
+  if (url.includes('/api/health') || url === '/api/health') {
+    if (req.method === 'GET') {
+      return handleHealth(res);
+    }
+    return res.status(405).json({ error: "Method not allowed" });
   }
 
-  if (req.method === 'POST' && path === 'generate') {
-    try {
-      const parseResult = generateRequestSchema.safeParse(req.body);
-      
-      if (!parseResult.success) {
-        return res.status(400).json({ 
-          error: "Invalid request", 
-          details: parseResult.error.errors 
-        });
-      }
-
-      const { prompt, model } = parseResult.data;
-
-      let tokens: GeneratedToken[];
-
-      if (model === "openai") {
-        if (!openai) {
-          return res.status(400).json({ 
-            error: "OpenAI API key not configured. Please use Gemini or add an OpenAI API key." 
-          });
-        }
-        tokens = await generateWithOpenAI(prompt);
-      } else {
-        if (!process.env.GEMINI_API_KEY) {
-          return res.status(400).json({ 
-            error: "Gemini API key not configured." 
-          });
-        }
-        tokens = await generateWithGemini(prompt);
-      }
-
-      return res.json({ 
-        tokens, 
-        model: model === "openai" ? "GPT-4o" : "Gemini 2.5 Flash" 
-      });
-    } catch (error) {
-      console.error("Generation error:", error);
-      return res.status(500).json({ 
-        error: "Failed to generate response",
-        details: error instanceof Error ? error.message : "Unknown error"
-      });
+  if (url.includes('/api/generate') || url === '/api/generate') {
+    if (req.method === 'POST') {
+      return handleGenerate(req, res);
     }
+    return res.status(405).json({ error: "Method not allowed" });
   }
 
-  if (req.method === 'POST' && path === 'regenerate') {
-    try {
-      const parseResult = regenerateRequestSchema.safeParse(req.body);
-      
-      if (!parseResult.success) {
-        return res.status(400).json({ 
-          error: "Invalid request", 
-          details: parseResult.error.errors 
-        });
-      }
-
-      const { originalPrompt, tokensBeforeChange, newToken, model } = parseResult.data;
-      
-      const newPrompt = [originalPrompt, ...tokensBeforeChange, newToken].join(" ");
-
-      let tokens: GeneratedToken[];
-
-      if (model === "openai") {
-        if (!openai) {
-          return res.status(400).json({ 
-            error: "OpenAI API key not configured" 
-          });
-        }
-        tokens = await generateWithOpenAI(newPrompt);
-      } else {
-        if (!process.env.GEMINI_API_KEY) {
-          return res.status(400).json({ 
-            error: "Gemini API key not configured" 
-          });
-        }
-        tokens = await generateWithGemini(newPrompt);
-      }
-
-      return res.json({ 
-        tokens, 
-        model: model === "openai" ? "GPT-4o" : "Gemini 2.5 Flash" 
-      });
-    } catch (error) {
-      console.error("Regeneration error:", error);
-      return res.status(500).json({ 
-        error: "Failed to regenerate response",
-        details: error instanceof Error ? error.message : "Unknown error"
-      });
+  if (url.includes('/api/regenerate') || url === '/api/regenerate') {
+    if (req.method === 'POST') {
+      return handleRegenerate(req, res);
     }
+    return res.status(405).json({ error: "Method not allowed" });
   }
 
   return res.status(404).json({ error: "Not found" });
