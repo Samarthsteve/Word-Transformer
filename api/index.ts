@@ -284,6 +284,7 @@ CRITICAL RULES:
       config: {
         systemInstruction: systemPrompt,
         responseMimeType: "application/json",
+        thinkingConfig: { thinkingBudget: 0 },
       },
       contents: `Continue this text with probability analysis: "${prompt}"`,
     })
@@ -361,6 +362,7 @@ CRITICAL RULES:
       model: "gemini-2.5-flash",
       config: {
         systemInstruction: systemPrompt,
+        thinkingConfig: { thinkingBudget: 0 },
       },
       contents: `Continue this text (do NOT repeat it, only add new words): "${prompt}"`,
     })
