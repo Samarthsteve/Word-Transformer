@@ -1,0 +1,93 @@
+2025-12-16 01:47:50.221 [info] The user provided Google Cloud credentials will take precedence over the API key from the environment variable.
+2025-12-16 01:47:50.221 [info] The user provided project/location will take precedence over the API key from the environment variables.
+2025-12-16 01:47:50.380 [error] Generation error: GaxiosError: invalid_grant: Invalid JWT Signature.
+    at Gaxios._request (/var/task/node_modules/gaxios/build/cjs/src/gaxios.js:155:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5) {
+  config: {
+    method: 'POST',
+    url: URL {
+      href: 'https://oauth2.googleapis.com/token',
+      origin: 'https://oauth2.googleapis.com',
+      protocol: 'https:',
+      username: '',
+      password: '',
+      host: 'oauth2.googleapis.com',
+      hostname: 'oauth2.googleapis.com',
+      port: '',
+      pathname: '/token',
+      search: '',
+      searchParams: URLSearchParams {},
+      hash: ''
+    },
+    data: URLSearchParams {
+      'grant_type' => '<<REDACTED> - See `errorRedactor` option in `gaxios` for configuration>.',
+      'assertion' => '<<REDACTED> - See `errorRedactor` option in `gaxios` for configuration>.' },
+    responseType: 'json',
+    retryConfig: {
+      httpMethodsToRetry: [Array],
+      currentRetryAttempt: 0,
+      retry: 3,
+      noResponseRetries: 2,
+      retryDelayMultiplier: 2,
+      timeOfFirstRequest: 1765849670376,
+      totalTimeout: 9007199254740991,
+      maxRetryDelay: 9007199254740991,
+      statusCodesToRetry: [Array]
+    },
+    body: URLSearchParams {
+      'grant_type' => '<<REDACTED> - See `errorRedactor` option in `gaxios` for configuration>.',
+      'assertion' => '<<REDACTED> - See `errorRedactor` option in `gaxios` for configuration>.' },
+    validateStatus: [Function: validateStatus],
+    errorRedactor: [Function: defaultErrorRedactor],
+    duplex: 'half',
+    headers: Headers {
+      accept: 'application/json',
+      'x-goog-api-client': 'gl-node/24.11.0',
+      'User-Agent': 'google-api-nodejs-client/10.5.0'
+    }
+  },
+  response: Response {
+    size: 0,
+    data: {
+      error: 'invalid_grant',
+      error_description: 'Invalid JWT Signature.'
+    },
+    config: {
+      method: 'POST',
+      url: URL {},
+      data: [Object],
+      responseType: 'json',
+      retryConfig: [Object],
+      body: [Object],
+      validateStatus: [Function: validateStatus],
+      errorRedactor: [Function: defaultErrorRedactor],
+      duplex: 'half',
+      headers: Headers {
+        accept: 'application/json',
+        'x-goog-api-client': 'gl-node/24.11.0',
+        'User-Agent': 'google-api-nodejs-client/10.5.0'
+      }
+    },
+    Symbol(Body internals): {
+      body: [Gunzip],
+      stream: [Gunzip],
+      boundary: null,
+      disturbed: true,
+      error: null
+    },
+    Symbol(Response internals): {
+      type: 'default',
+      url: 'https://oauth2.googleapis.com/token',
+      status: 400,
+      statusText: 'Bad Request',
+      headers: [Object],
+      counter: 0,
+      highWaterMark: 16384
+    }
+  },
+  code: 400,
+  status: 400,
+  error: undefined,
+  Symbol(gaxios-gaxios-error): '7.1.3',
+  [cause]: { message: 'invalid_grant', code: 400, status: 'Bad Request' }
+}
