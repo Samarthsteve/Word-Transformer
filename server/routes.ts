@@ -4,7 +4,31 @@ import { GoogleGenAI } from "@google/genai";
 import OpenAI from "openai";
 import { generateRequestSchema, regenerateRequestSchema, type GeneratedToken } from "@shared/schema";
 
-const gemini = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+function getGeminiClient() {
+  const serviceAccountKey = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
+  
+  if (serviceAccountKey) {
+    try {
+      const credentials = JSON.parse(serviceAccountKey);
+      return new GoogleGenAI({
+        vertexai: true,
+        project: credentials.project_id,
+        location: "us-central1",
+        googleAuthOptions: {
+          credentials: credentials,
+        },
+      });
+    } catch (e) {
+      console.error("Failed to parse service account key:", e);
+    }
+  }
+  
+  if (process.env.GEMINI_API_KEY) {
+    return new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  }
+  
+  throw new Error("No Gemini credentials configured");
+}
 
 const openai = process.env.OPENAI_API_KEY 
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
@@ -258,6 +282,7 @@ CRITICAL RULES:
 5. Each token must have 4-5 alternatives with decreasing probabilities
 6. VARY the probabilities - avoid patterns like always using 0.25, 0.15, 0.10, 0.05`;
 
+  const gemini = getGeminiClient();
   const response = await retryWithBackoff(() => 
     gemini.models.generateContent({
       model: "gemini-2.5-flash",
@@ -335,6 +360,7 @@ CRITICAL RULES:
 4. Generate 8-15 additional words that naturally continue the text
 5. Return ONLY the continuation, nothing else`;
 
+  const gemini = getGeminiClient();
   const response = await retryWithBackoff(() =>
     gemini.models.generateContent({
       model: "gemini-2.5-flash",
@@ -380,7 +406,7 @@ Provide 4 alternative words for each that could replace it in context. Return JS
 
   try {
     const altResponse = await retryWithBackoff(() =>
-      gemini.models.generateContent({
+      getGeminiClient().models.generateContent({
         model: "gemini-2.5-flash",
         config: {
           responseMimeType: "application/json",
@@ -464,9 +490,9 @@ export async function registerRoutes(
         }
         tokens = await generateWithOpenAI(prompt);
       } else {
-        if (!process.env.GEMINI_API_KEY) {
+        if (!process.env.GEMINI_API_KEY && !process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
           return res.status(400).json({ 
-            error: "Gemini API key not configured." 
+            error: "Gemini credentials not configured." 
           });
         }
         tokens = await generateWithGemini(prompt);
@@ -510,9 +536,9 @@ export async function registerRoutes(
         }
         tokens = await generateWithOpenAI(newPrompt);
       } else {
-        if (!process.env.GEMINI_API_KEY) {
+        if (!process.env.GEMINI_API_KEY && !process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
           return res.status(400).json({ 
-            error: "Gemini API key not configured" 
+            error: "Gemini credentials not configured" 
           });
         }
         tokens = await generateWithGemini(newPrompt);
@@ -534,7 +560,7 @@ export async function registerRoutes(
   app.get("/api/health", (_req, res) => {
     res.json({ 
       status: "ok",
-      geminiConfigured: !!process.env.GEMINI_API_KEY,
+      geminiConfigured: !!(process.env.GEMINI_API_KEY || process.env.GOOGLE_SERVICE_ACCOUNT_KEY),
       openaiConfigured: !!process.env.OPENAI_API_KEY,
     });
   });

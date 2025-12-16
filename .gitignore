@@ -4,3 +4,9 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+
+# Service account keys - NEVER commit these
+key/
+*.json.key
+*-key.json
+service-account*.json
