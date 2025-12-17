@@ -22,29 +22,11 @@ type GeneratedToken = {
 };
 
 function getGeminiClient() {
-  const serviceAccountKey = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
-  
-  if (serviceAccountKey) {
-    try {
-      const credentials = JSON.parse(serviceAccountKey);
-      return new GoogleGenAI({
-        vertexai: true,
-        project: credentials.project_id,
-        location: "us-central1",
-        googleAuthOptions: {
-          credentials: credentials,
-        },
-      });
-    } catch (e) {
-      console.error("Failed to parse service account key:", e);
-    }
-  }
-  
   if (process.env.GEMINI_API_KEY) {
     return new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   }
   
-  throw new Error("No Gemini credentials configured");
+  throw new Error("No Gemini API key configured. Please set GEMINI_API_KEY.");
 }
 
 function getOpenAIClient() {
@@ -442,7 +424,7 @@ async function handleGenerate(req: VercelRequest, res: VercelResponse) {
       }
       tokens = await generateWithOpenAI(prompt);
     } else {
-      if (!process.env.GEMINI_API_KEY && !process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
+      if (!process.env.GEMINI_API_KEY) {
         return res.status(400).json({ 
           error: "Gemini credentials not configured." 
         });
@@ -488,7 +470,7 @@ async function handleRegenerate(req: VercelRequest, res: VercelResponse) {
       }
       tokens = await generateWithOpenAI(newPrompt);
     } else {
-      if (!process.env.GEMINI_API_KEY && !process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
+      if (!process.env.GEMINI_API_KEY) {
         return res.status(400).json({ 
           error: "Gemini credentials not configured" 
         });
@@ -512,7 +494,7 @@ async function handleRegenerate(req: VercelRequest, res: VercelResponse) {
 function handleHealth(res: VercelResponse) {
   return res.status(200).json({ 
     status: "ok",
-    geminiConfigured: !!(process.env.GEMINI_API_KEY || process.env.GOOGLE_SERVICE_ACCOUNT_KEY),
+    geminiConfigured: !!process.env.GEMINI_API_KEY,
     openaiConfigured: !!process.env.OPENAI_API_KEY,
   });
 }

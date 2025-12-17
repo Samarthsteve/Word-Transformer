@@ -5,29 +5,11 @@ import OpenAI from "openai";
 import { generateRequestSchema, regenerateRequestSchema, type GeneratedToken } from "@shared/schema";
 
 function getGeminiClient() {
-  const serviceAccountKey = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
-  
-  if (serviceAccountKey) {
-    try {
-      const credentials = JSON.parse(serviceAccountKey);
-      return new GoogleGenAI({
-        vertexai: true,
-        project: credentials.project_id,
-        location: "us-central1",
-        googleAuthOptions: {
-          credentials: credentials,
-        },
-      });
-    } catch (e) {
-      console.error("Failed to parse service account key:", e);
-    }
-  }
-  
   if (process.env.GEMINI_API_KEY) {
     return new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   }
   
-  throw new Error("No Gemini credentials configured");
+  throw new Error("No Gemini API key configured. Please set GEMINI_API_KEY.");
 }
 
 const openai = process.env.OPENAI_API_KEY 
@@ -490,7 +472,7 @@ export async function registerRoutes(
         }
         tokens = await generateWithOpenAI(prompt);
       } else {
-        if (!process.env.GEMINI_API_KEY && !process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
+        if (!process.env.GEMINI_API_KEY) {
           return res.status(400).json({ 
             error: "Gemini credentials not configured." 
           });
@@ -536,7 +518,7 @@ export async function registerRoutes(
         }
         tokens = await generateWithOpenAI(newPrompt);
       } else {
-        if (!process.env.GEMINI_API_KEY && !process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
+        if (!process.env.GEMINI_API_KEY) {
           return res.status(400).json({ 
             error: "Gemini credentials not configured" 
           });
@@ -560,7 +542,7 @@ export async function registerRoutes(
   app.get("/api/health", (_req, res) => {
     res.json({ 
       status: "ok",
-      geminiConfigured: !!(process.env.GEMINI_API_KEY || process.env.GOOGLE_SERVICE_ACCOUNT_KEY),
+      geminiConfigured: !!process.env.GEMINI_API_KEY,
       openaiConfigured: !!process.env.OPENAI_API_KEY,
     });
   });
