@@ -246,7 +246,7 @@ async function generateWithGemini(prompt: string): Promise<GeneratedToken[]> {
   const systemPrompt = `You are a text completion engine that generates token continuations with alternatives.
 
 STRICT REQUIREMENTS:
-1. Generate EXACTLY 10-12 words to continue the text (NO MORE, NO LESS)
+1. Generate EXACTLY 12-16 words to continue the text (NO MORE, NO LESS)
 2. For EACH generated word, provide EXACTLY 4 alternative words
 3. Return ONLY valid JSON, nothing else
 4. Do NOT repeat any words from the input text
@@ -260,7 +260,7 @@ Format output as JSON:
 }
 
 Probability rules:
-- Each chosen word: 0.35-0.75 (varies by predictability)
+- Each chosen word: 0.45-0.95 (varies by predictability)
 - Alternatives: decreasing order, sum < 0.5
 - Use specific decimals: 0.47, 0.23, 0.18, 0.12, 0.09, 0.06, 0.04, 0.03`;
 
@@ -271,7 +271,7 @@ Probability rules:
         systemInstruction: systemPrompt,
         responseMimeType: "application/json",
         thinkingConfig: { thinkingBudget: 0 },
-        maxOutputTokens: 500,
+        maxOutputTokens: 750,
       },
       contents: `Continue: "${prompt}"`,
     })
