@@ -284,7 +284,7 @@ CRITICAL RULES:
 
   const response = await retryWithBackoff(() => 
     gemini.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-2.5-flash-lite",
       config: {
         systemInstruction: systemPrompt,
         responseMimeType: "application/json",
@@ -363,7 +363,7 @@ CRITICAL RULES:
 
   const response = await retryWithBackoff(() =>
     gemini.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-2.5-flash-lite",
       config: {
         systemInstruction: systemPrompt,
         thinkingConfig: { thinkingBudget: 0 },

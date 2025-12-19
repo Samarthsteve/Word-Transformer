@@ -267,7 +267,7 @@ CRITICAL RULES:
   const gemini = getGeminiClient();
   const response = await retryWithBackoff(() => 
     gemini.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-2.5-flash-lite",
       config: {
         systemInstruction: systemPrompt,
         responseMimeType: "application/json",
@@ -345,7 +345,7 @@ CRITICAL RULES:
   const gemini = getGeminiClient();
   const response = await retryWithBackoff(() =>
     gemini.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-2.5-flash-lite",
       config: {
         systemInstruction: systemPrompt,
         thinkingConfig: { thinkingBudget: 0 },
@@ -389,7 +389,7 @@ Provide 4 alternative words for each that could replace it in context. Return JS
   try {
     const altResponse = await retryWithBackoff(() =>
       getGeminiClient().models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-2.5-flash-lite",
         config: {
           responseMimeType: "application/json",
           thinkingConfig: { thinkingBudget: 0 },
