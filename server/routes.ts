@@ -225,81 +225,67 @@ async function retryWithBackoff<T>(
 }
 
 async function generateWithGemini(prompt: string): Promise<GeneratedToken[]> {
-  const systemPrompt = `You are an expert text completion engine that simulates natural language model behavior with probability distributions. Your task is to continue text with complete accuracy and provide realistic, context-aware probabilities.
-
-DETAILED INSTRUCTIONS:
-
-1. TEXT CONTINUATION:
-   - Generate exactly 10-12 new words that naturally follow the given text
-   - Maintain semantic coherence and grammatical correctness
-   - Never repeat any words from the input text
-   - Consider context and writing style
-
-2. PROBABILITY ASSIGNMENT:
-   - For EACH generated word, assign a "chosen probability" representing how likely that word is at that position
-   - The chosen probability should vary based on context predictability:
-     * High probability (0.6-0.8): Highly predictable words (articles, prepositions after certain contexts)
-     * Medium probability (0.4-0.6): Words with moderate predictability
-     * Lower probability (0.2-0.5): Less certain words in more creative contexts
-   - Use realistic, varied decimal values - NOT round numbers
-
-3. ALTERNATIVES FOR EVERY WORD:
-   - For EACH generated word, provide exactly 4 alternative words that could reasonably replace it
-   - Alternative words must be contextually appropriate
-   - Assign decreasing probabilities to alternatives:
-     * 1st alternative: typically 0.15-0.35
-     * 2nd alternative: typically 0.08-0.20
-     * 3rd alternative: typically 0.04-0.12
-     * 4th alternative: typically 0.02-0.06
-   - Probabilities must be realistic and contextually sound
-   - Ensure alternatives sum to less than 0.5
-
-4. OUTPUT FORMAT (MUST BE VALID JSON):
-{
-  "tokens": [
-    {
-      "chosen": "word",
-      "chosenProbability": 0.52,
-      "alternatives": [
-        {"token": "alternative1", "probability": 0.28},
-        {"token": "alternative2", "probability": 0.12},
-        {"token": "alternative3", "probability": 0.06},
-        {"token": "alternative4", "probability": 0.02}
-      ]
-    }
-  ]
-}
-
-CRITICAL RULES:
-- EVERY word must have EXACTLY 4 alternatives - no exceptions
-- ALL probabilities must be realistic decimal values with 2-3 decimal places
-- Use varied probability values (0.47, 0.23, 0.18, 0.31, 0.14, 0.09, 0.05, 0.03, etc.)
-- Return ONLY the JSON object, nothing else
-- Do NOT include markdown code blocks or backticks`;
-
+  // Step 1: Generate the continuation text
   const gemini = getGeminiClient();
-  const response = await retryWithBackoff(() => 
+  
+  const continuationPrompt = `Continue this text with exactly 10-12 new words. Return ONLY the continuation, nothing else.
+Do NOT repeat any words from the input. Write naturally and coherently.`;
+
+  const continuationResponse = await retryWithBackoff(() =>
     gemini.models.generateContent({
       model: "gemini-2.5-flash-lite",
       config: {
-        systemInstruction: systemPrompt,
-        responseMimeType: "application/json",
+        systemInstruction: continuationPrompt,
         thinkingConfig: { thinkingBudget: 5000 },
-        maxOutputTokens: 500,
+        maxOutputTokens: 100,
       },
-      contents: `Continue this text with probability analysis: "${prompt}"`,
+      contents: prompt,
     })
   );
 
-  let responseText = response.text || "";
+  let continuation = (continuationResponse.text || "").trim();
+  const generatedWords = continuation.split(/\s+/).filter(w => w.length > 0).slice(0, 12);
   
+  if (generatedWords.length === 0) {
+    return generateWithGeminiFallback(prompt);
+  }
+
+  // Step 2: Get probabilities and alternatives for each word
+  const probabilityPrompt = `Given this context: "${prompt}"
+And these generated words: ${generatedWords.join(", ")}
+
+For EACH word, provide:
+1. Its probability at that position (0.2-0.8)
+2. Exactly 4 alternative words with decreasing probabilities
+
+Return ONLY valid JSON, no other text:
+{
+  "tokens": [
+    {"chosen": "word", "chosenProbability": 0.52, "alternatives": [{"token": "alt1", "probability": 0.28}, {"token": "alt2", "probability": 0.15}, {"token": "alt3", "probability": 0.06}, {"token": "alt4", "probability": 0.01}]},
+    ...
+  ]
+}`;
+
   try {
-    responseText = responseText.replace(/```json\n?|\n?```/g, "").trim();
-    console.log("Gemini response:", responseText.substring(0, 500));
+    const probResponse = await retryWithBackoff(() =>
+      gemini.models.generateContent({
+        model: "gemini-2.5-flash-lite",
+        config: {
+          systemInstruction: probabilityPrompt,
+          responseMimeType: "application/json",
+          thinkingConfig: { thinkingBudget: 5000 },
+          maxOutputTokens: 500,
+        },
+        contents: `Words: ${generatedWords.join(", ")}`,
+      })
+    );
+
+    let responseText = (probResponse.text || "").replace(/```json\n?|\n?```/g, "").trim();
+    console.log("Probability response:", responseText.substring(0, 300));
     
     const parsed = JSON.parse(responseText);
     
-    if (parsed.tokens && Array.isArray(parsed.tokens)) {
+    if (parsed.tokens && Array.isArray(parsed.tokens) && parsed.tokens.length > 0) {
       const tokens: GeneratedToken[] = [];
       
       for (const tokenData of parsed.tokens) {
@@ -310,12 +296,10 @@ CRITICAL RULES:
             for (const alt of tokenData.alternatives) {
               if (alt.token && typeof alt.probability === "number") {
                 const prob = Math.min(Math.max(alt.probability, 0), 1);
-                if (alt.token.toLowerCase() !== tokenData.chosen.toLowerCase()) {
-                  alternatives.push({
-                    token: alt.token,
-                    probability: prob,
-                  });
-                }
+                alternatives.push({
+                  token: alt.token,
+                  probability: prob,
+                });
               }
             }
           }
@@ -324,26 +308,24 @@ CRITICAL RULES:
           
           const chosenProb = tokenData.chosenProbability 
             ? Math.min(Math.max(tokenData.chosenProbability, 0), 1)
-            : alternatives.length > 0 
-              ? Math.min(alternatives[0].probability * (1.3 + Math.random() * 0.5), 0.95)
-              : 0.45 + Math.random() * 0.35;
+            : 0.5;
           
           tokens.push({
             token: tokenData.chosen,
-            alternatives: alternatives.slice(0, 5),
+            alternatives: alternatives.slice(0, 4),
             chosenProbability: chosenProb,
           });
         }
       }
       
       if (tokens.length > 0) {
-        console.log("Successfully parsed tokens:", tokens.length);
+        console.log("Successfully generated tokens with log probs approach:", tokens.length);
         return tokens;
       }
     }
-    console.log("Invalid token structure from Gemini");
-  } catch (parseError) {
-    console.error("Failed to parse Gemini JSON response:", parseError);
+    console.log("Invalid probability response");
+  } catch (probError) {
+    console.error("Failed to get probabilities:", probError);
   }
   
   return generateWithGeminiFallback(prompt);
