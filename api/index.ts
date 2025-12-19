@@ -1,18 +1,15 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenAI } from "@google/genai";
-import OpenAI from "openai";
 import { z } from "zod";
 
 const generateRequestSchema = z.object({
   prompt: z.string().min(1),
-  model: z.enum(["gemini", "openai"]).default("gemini"),
 });
 
 const regenerateRequestSchema = z.object({
   originalPrompt: z.string(),
   tokensBeforeChange: z.array(z.string()),
   newToken: z.string(),
-  model: z.enum(["gemini", "openai"]).default("gemini"),
 });
 
 type GeneratedToken = {
@@ -25,195 +22,7 @@ function getGeminiClient() {
   if (process.env.GEMINI_API_KEY) {
     return new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   }
-  
   throw new Error("No Gemini API key configured. Please set GEMINI_API_KEY.");
-}
-
-function getOpenAIClient() {
-  return process.env.OPENAI_API_KEY 
-    ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-    : null;
-}
-
-function logProbToProb(logProb: number): number {
-  return Math.min(Math.max(Math.exp(logProb), 0), 1);
-}
-
-type WordLogprobData = {
-  word: string;
-  summedLogprob: number;
-  topLogprobs: Array<{ token: string; logprob: number }>;
-};
-
-function aggregateLogprobsToWords(
-  logprobsContent: Array<{
-    token: string;
-    logprob: number;
-    top_logprobs?: Array<{ token: string; logprob: number }>;
-  }>
-): WordLogprobData[] {
-  const words: WordLogprobData[] = [];
-  let currentWord = "";
-  let currentSummedLogprob = 0;
-  let currentTopLogprobs: Array<{ token: string; logprob: number }> = [];
-
-  for (const item of logprobsContent) {
-    const token = item.token;
-    
-    const startsWithSpace = token.startsWith(" ") || token.startsWith("\n");
-    const isOnlyPunctuation = /^[\s\n]*[^\w\s]+[\s\n]*$/.test(token);
-    const cleanToken = token.replace(/^[\s\n]+/, "");
-    
-    if (startsWithSpace && currentWord.length > 0) {
-      words.push({
-        word: currentWord,
-        summedLogprob: currentSummedLogprob,
-        topLogprobs: currentTopLogprobs,
-      });
-      currentWord = cleanToken;
-      currentSummedLogprob = item.logprob;
-      currentTopLogprobs = item.top_logprobs || [];
-    } else if (isOnlyPunctuation && currentWord.length > 0) {
-      currentWord += token.trim();
-      currentSummedLogprob += item.logprob;
-    } else {
-      if (currentWord.length === 0) {
-        currentWord = cleanToken;
-        currentSummedLogprob = item.logprob;
-        currentTopLogprobs = item.top_logprobs || [];
-      } else {
-        currentWord += token;
-        currentSummedLogprob += item.logprob;
-      }
-    }
-  }
-
-  if (currentWord.length > 0) {
-    words.push({
-      word: currentWord,
-      summedLogprob: currentSummedLogprob,
-      topLogprobs: currentTopLogprobs,
-    });
-  }
-
-  return words;
-}
-
-async function generateWithOpenAI(prompt: string): Promise<GeneratedToken[]> {
-  const openai = getOpenAIClient();
-  if (!openai) {
-    throw new Error("OpenAI API key not configured");
-  }
-
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o",
-    messages: [
-      {
-        role: "system",
-        content: `You are a text completion engine. Your ONLY job is to continue the text that the user provides.
-
-CRITICAL RULES:
-1. Do NOT repeat any part of the user's text
-2. Do NOT add quotation marks, commentary, or explanations  
-3. Simply continue writing from exactly where the user left off
-4. Generate 8-15 additional words that naturally continue the text
-5. Return ONLY the continuation, nothing else`,
-      },
-      { role: "user", content: `Continue this text (do NOT repeat it, only add new words): "${prompt}"` },
-    ],
-    max_tokens: 100,
-    logprobs: true,
-    top_logprobs: 5,
-  });
-
-  let text = response.choices[0]?.message?.content || "";
-  const logprobsContent = response.choices[0]?.logprobs?.content || [];
-  
-  text = text.replace(/^["'\s]+|["'\s]+$/g, "").trim();
-  
-  const promptWords = prompt.toLowerCase().split(/\s+/);
-  const textWords = text.split(/\s+/).filter(w => w.length > 0);
-  
-  let startIndex = 0;
-  for (let i = 0; i < Math.min(textWords.length, promptWords.length + 3); i++) {
-    const cleanWord = textWords[i]?.toLowerCase().replace(/[^a-z0-9]/g, "");
-    const promptWord = promptWords[i]?.replace(/[^a-z0-9]/g, "");
-    if (cleanWord === promptWord) {
-      startIndex = i + 1;
-    } else {
-      break;
-    }
-  }
-  
-  const continuationWords = textWords.slice(startIndex);
-  const aggregatedWords = aggregateLogprobsToWords(logprobsContent);
-  const tokens: GeneratedToken[] = [];
-  
-  for (let i = 0; i < continuationWords.length; i++) {
-    const word = continuationWords[i];
-    const alternatives: { token: string; probability: number }[] = [];
-    
-    let matchedData: WordLogprobData | undefined;
-    
-    const cleanTargetWord = word.toLowerCase().replace(/[^a-z0-9]/g, "");
-    for (let j = 0; j < aggregatedWords.length; j++) {
-      const aggWord = aggregatedWords[j];
-      const cleanAggWord = aggWord.word.toLowerCase().replace(/[^a-z0-9]/g, "");
-      if (cleanAggWord === cleanTargetWord || aggWord.word === word) {
-        matchedData = aggWord;
-        aggregatedWords.splice(j, 1);
-        break;
-      }
-    }
-    
-    let chosenTokenProb = 0.75;
-    
-    if (matchedData) {
-      chosenTokenProb = logProbToProb(matchedData.summedLogprob);
-      
-      if (matchedData.topLogprobs && matchedData.topLogprobs.length > 0) {
-        const seenTokens = new Set<string>();
-        seenTokens.add(word.toLowerCase());
-        
-        for (const alt of matchedData.topLogprobs) {
-          const cleanToken = alt.token.trim().replace(/^[\s\n]+|[\s\n]+$/g, "");
-          
-          if (cleanToken.length === 0 || /^[^\w]+$/.test(cleanToken)) {
-            continue;
-          }
-          
-          if (!seenTokens.has(cleanToken.toLowerCase())) {
-            seenTokens.add(cleanToken.toLowerCase());
-            const prob = logProbToProb(alt.logprob);
-            if (prob > 0.001 && prob < chosenTokenProb) {
-              alternatives.push({
-                token: cleanToken,
-                probability: prob,
-              });
-            }
-          }
-        }
-      }
-    }
-    
-    alternatives.sort((a, b) => b.probability - a.probability);
-    const finalAlternatives = alternatives.slice(0, 5);
-    
-    if (finalAlternatives.length > 0) {
-      finalAlternatives.unshift({
-        token: word,
-        probability: chosenTokenProb,
-      });
-    }
-    
-    tokens.push({
-      token: word,
-      alternatives: finalAlternatives.filter(a => a.token !== word).slice(0, 5),
-      chosenProbability: chosenTokenProb,
-    });
-  }
-
-  return tokens;
 }
 
 async function retryWithBackoff<T>(
@@ -241,12 +50,10 @@ async function retryWithBackoff<T>(
 }
 
 async function generateWithGemini(prompt: string): Promise<GeneratedToken[]> {
-  const gemini = getGeminiClient();
-  
   const systemPrompt = `You are a text completion engine that generates token continuations with alternatives.
 
 STRICT REQUIREMENTS:
-1. Generate EXACTLY 12-16 words to continue the text (NO MORE, NO LESS)
+1. Generate EXACTLY 10-12 words to continue the text (NO MORE, NO LESS)
 2. For EACH generated word, provide EXACTLY 4 alternative words
 3. Return ONLY valid JSON, nothing else
 4. Do NOT repeat any words from the input text
@@ -260,10 +67,11 @@ Format output as JSON:
 }
 
 Probability rules:
-- Each chosen word: 0.45-0.95 (varies by predictability)
+- Each chosen word: 0.35-0.75 (varies by predictability)
 - Alternatives: decreasing order, sum < 0.5
 - Use specific decimals: 0.47, 0.23, 0.18, 0.12, 0.09, 0.06, 0.04, 0.03`;
 
+  const gemini = getGeminiClient();
   const response = await retryWithBackoff(() => 
     gemini.models.generateContent({
       model: "gemini-2.5-flash-lite",
@@ -271,7 +79,7 @@ Probability rules:
         systemInstruction: systemPrompt,
         responseMimeType: "application/json",
         thinkingConfig: { thinkingBudget: 0 },
-        maxOutputTokens: 750,
+        maxOutputTokens: 500,
       },
       contents: `Continue: "${prompt}"`,
     })
@@ -281,7 +89,6 @@ Probability rules:
   
   try {
     responseText = responseText.replace(/```json\n?|\n?```/g, "").trim();
-    
     const parsed = JSON.parse(responseText);
     
     if (parsed.tokens && Array.isArray(parsed.tokens)) {
@@ -296,10 +103,7 @@ Probability rules:
               if (alt.token && typeof alt.probability === "number") {
                 const prob = Math.min(Math.max(alt.probability, 0), 1);
                 if (alt.token.toLowerCase() !== tokenData.chosen.toLowerCase()) {
-                  alternatives.push({
-                    token: alt.token,
-                    probability: prob,
-                  });
+                  alternatives.push({ token: alt.token, probability: prob });
                 }
               }
             }
@@ -310,78 +114,24 @@ Probability rules:
           const chosenProb = tokenData.chosenProbability 
             ? Math.min(Math.max(tokenData.chosenProbability, 0), 1)
             : alternatives.length > 0 
-              ? Math.min(alternatives[0].probability * (1.3 + Math.random() * 0.5), 0.95)
+              ? Math.min(alternatives[0].probability * 1.3, 0.95)
               : 0.45 + Math.random() * 0.35;
           
           tokens.push({
             token: tokenData.chosen,
-            alternatives: alternatives.slice(0, 5),
+            alternatives: alternatives.slice(0, 4),
             chosenProbability: chosenProb,
           });
         }
       }
       
-      if (tokens.length > 0) {
-        return tokens;
-      }
+      if (tokens.length > 0) return tokens;
     }
   } catch (parseError) {
-    console.error("Failed to parse Gemini JSON response, falling back to simple generation:", parseError);
+    console.error("Failed to parse Gemini response:", parseError);
   }
   
-  return generateWithGeminiFallback(prompt);
-}
-
-async function generateWithGeminiFallback(prompt: string): Promise<GeneratedToken[]> {
-  const gemini = getGeminiClient();
-  
-  const systemPrompt = `You are a text completion engine. Your ONLY job is to continue the text that the user provides.
-
-CRITICAL RULES:
-1. Do NOT repeat any part of the user's text
-2. Do NOT add quotation marks, commentary, or explanations
-3. Simply continue writing from exactly where the user left off
-4. Generate 8-15 additional words that naturally continue the text
-5. Return ONLY the continuation, nothing else`;
-
-  const response = await retryWithBackoff(() =>
-    gemini.models.generateContent({
-      model: "gemini-2.5-flash-lite",
-      config: {
-        systemInstruction: systemPrompt,
-        thinkingConfig: { thinkingBudget: 0 },
-      },
-      contents: `Continue this text (do NOT repeat it, only add new words): "${prompt}"`,
-    })
-  );
-
-  let text = response.text || "";
-  
-  text = text.replace(/^["'\s]+|["'\s]+$/g, "").trim();
-  
-  const promptWords = prompt.toLowerCase().split(/\s+/);
-  const textWords = text.split(/\s+/).filter(w => w.length > 0);
-  
-  let startIndex = 0;
-  for (let i = 0; i < Math.min(textWords.length, promptWords.length + 3); i++) {
-    const cleanWord = textWords[i]?.toLowerCase().replace(/[^a-z0-9]/g, "");
-    const promptWord = promptWords[i]?.replace(/[^a-z0-9]/g, "");
-    if (cleanWord === promptWord) {
-      startIndex = i + 1;
-    } else {
-      break;
-    }
-  }
-  
-  const continuationWords = textWords.slice(startIndex);
-  
-  const tokens: GeneratedToken[] = continuationWords.map((word) => ({
-    token: word,
-    alternatives: [],
-    chosenProbability: 0.4 + Math.random() * 0.4,
-  }));
-
-  return tokens;
+  throw new Error("Failed to generate tokens");
 }
 
 async function handleGenerate(req: VercelRequest, res: VercelResponse) {
@@ -389,36 +139,17 @@ async function handleGenerate(req: VercelRequest, res: VercelResponse) {
     const parseResult = generateRequestSchema.safeParse(req.body);
     
     if (!parseResult.success) {
-      return res.status(400).json({ 
-        error: "Invalid request", 
-        details: parseResult.error.errors 
-      });
+      return res.status(400).json({ error: "Invalid request", details: parseResult.error.errors });
     }
 
-    const { prompt, model } = parseResult.data;
+    const { prompt } = parseResult.data;
 
-    let tokens: GeneratedToken[];
-
-    if (model === "openai") {
-      if (!process.env.OPENAI_API_KEY) {
-        return res.status(400).json({ 
-          error: "OpenAI API key not configured. Please use Gemini or add an OpenAI API key." 
-        });
-      }
-      tokens = await generateWithOpenAI(prompt);
-    } else {
-      if (!process.env.GEMINI_API_KEY) {
-        return res.status(400).json({ 
-          error: "Gemini credentials not configured." 
-        });
-      }
-      tokens = await generateWithGemini(prompt);
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(400).json({ error: "Gemini credentials not configured." });
     }
 
-    return res.status(200).json({ 
-      tokens, 
-      model: model === "openai" ? "GPT-4o" : "Gemini 2.5 Flash" 
-    });
+    const tokens = await generateWithGemini(prompt);
+    return res.status(200).json({ tokens, model: "Gemini 2.5 Flash Lite" });
   } catch (error) {
     console.error("Generation error:", error);
     return res.status(500).json({ 
@@ -433,38 +164,18 @@ async function handleRegenerate(req: VercelRequest, res: VercelResponse) {
     const parseResult = regenerateRequestSchema.safeParse(req.body);
     
     if (!parseResult.success) {
-      return res.status(400).json({ 
-        error: "Invalid request", 
-        details: parseResult.error.errors 
-      });
+      return res.status(400).json({ error: "Invalid request", details: parseResult.error.errors });
     }
 
-    const { originalPrompt, tokensBeforeChange, newToken, model } = parseResult.data;
-    
+    const { originalPrompt, tokensBeforeChange, newToken } = parseResult.data;
     const newPrompt = [originalPrompt, ...tokensBeforeChange, newToken].join(" ");
 
-    let tokens: GeneratedToken[];
-
-    if (model === "openai") {
-      if (!process.env.OPENAI_API_KEY) {
-        return res.status(400).json({ 
-          error: "OpenAI API key not configured" 
-        });
-      }
-      tokens = await generateWithOpenAI(newPrompt);
-    } else {
-      if (!process.env.GEMINI_API_KEY) {
-        return res.status(400).json({ 
-          error: "Gemini credentials not configured" 
-        });
-      }
-      tokens = await generateWithGemini(newPrompt);
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(400).json({ error: "Gemini credentials not configured" });
     }
 
-    return res.status(200).json({ 
-      tokens, 
-      model: model === "openai" ? "GPT-4o" : "Gemini 2.5 Flash" 
-    });
+    const tokens = await generateWithGemini(newPrompt);
+    return res.status(200).json({ tokens, model: "Gemini 2.5 Flash Lite" });
   } catch (error) {
     console.error("Regeneration error:", error);
     return res.status(500).json({ 
@@ -478,7 +189,6 @@ function handleHealth(res: VercelResponse) {
   return res.status(200).json({ 
     status: "ok",
     geminiConfigured: !!process.env.GEMINI_API_KEY,
-    openaiConfigured: !!process.env.OPENAI_API_KEY,
   });
 }
 
