@@ -243,26 +243,22 @@ async function retryWithBackoff<T>(
 async function generateWithGemini(prompt: string): Promise<GeneratedToken[]> {
   const gemini = getGeminiClient();
   
-  const systemPrompt = `You are a text completion engine that generates token continuations with alternatives.
+  const systemPrompt = `Generate JSON with word continuations and alternatives. Must be valid JSON.
 
-STRICT REQUIREMENTS:
-1. Generate EXACTLY 10-12 words to continue the text (NO MORE, NO LESS)
-2. For EACH generated word, provide EXACTLY 4 alternative words
-3. Return ONLY valid JSON, nothing else
-4. Do NOT repeat any words from the input text
-
-Format output as JSON:
+Output exactly this format (NO OTHER TEXT):
 {
   "tokens": [
-    {"chosen": "word", "chosenProbability": 0.45, "alternatives": [{"token": "alt1", "probability": 0.25}, {"token": "alt2", "probability": 0.15}, {"token": "alt3", "probability": 0.10}, {"token": "alt4", "probability": 0.05}]},
-    ...
+    {"chosen": "word1", "chosenProbability": 0.48, "alternatives": [{"token": "alt1", "probability": 0.22}, {"token": "alt2", "probability": 0.15}, {"token": "alt3", "probability": 0.10}, {"token": "alt4", "probability": 0.05}]},
+    {"chosen": "word2", "chosenProbability": 0.55, "alternatives": [{"token": "alt1", "probability": 0.20}, {"token": "alt2", "probability": 0.12}, {"token": "alt3", "probability": 0.08}, {"token": "alt4", "probability": 0.05}]}
   ]
 }
 
-Probability rules:
-- Each chosen word: 0.35-0.75 (varies by predictability)
-- Alternatives: decreasing order, sum < 0.5
-- Use specific decimals: 0.47, 0.23, 0.18, 0.12, 0.09, 0.06, 0.04, 0.03`;
+RULES:
+- Generate 10-12 words total
+- Each word must have exactly 4 alternatives
+- chosen 0.35-0.75, alternatives decreasing
+- No input text repetition
+- ONLY output JSON`;
 
   const response = await retryWithBackoff(() => 
     gemini.models.generateContent({
@@ -271,7 +267,7 @@ Probability rules:
         systemInstruction: systemPrompt,
         responseMimeType: "application/json",
         thinkingConfig: { thinkingBudget: 0 },
-        maxOutputTokens: 500,
+        maxOutputTokens: 300,
       },
       contents: `Continue: "${prompt}"`,
     })
