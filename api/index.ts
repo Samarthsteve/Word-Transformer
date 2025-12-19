@@ -246,7 +246,7 @@ async function generateWithGemini(prompt: string): Promise<GeneratedToken[]> {
   const systemPrompt = `You are a text completion engine that simulates how a language model generates text with probability distributions.
 
 Your task is to:
-1. Continue the given text naturally with 8-15 words
+1. Continue the given text with a complete, coherent sentence or thought. Focus on quality and demonstrating linguistic prowess - generate as many words as needed to complete a meaningful, well-formed sentence (typically 12-25 words, but more if needed for completeness).
 2. For EACH word you generate, provide 4-5 alternative words with REALISTIC and VARIED probability scores
 
 IMPORTANT - Probability Guidelines:
