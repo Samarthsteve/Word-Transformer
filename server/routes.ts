@@ -228,7 +228,7 @@ async function generateWithGemini(prompt: string): Promise<GeneratedToken[]> {
   const systemPrompt = `You are a text completion engine that simulates how a language model generates text with probability distributions.
 
 Your task is to:
-1. Continue the given text with a complete, coherent sentence or thought. Generate between 15-25 words exactly. Focus on quality and linguistic precision to demonstrate capability within this constraint.
+1. Continue the given text naturally with 8-15 words
 2. For EACH word you generate, provide 4-5 alternative words with REALISTIC and VARIED probability scores
 
 IMPORTANT - Probability Guidelines:
@@ -482,7 +482,7 @@ export async function registerRoutes(
 
       return res.json({ 
         tokens, 
-        model: model === "openai" ? "GPT-4o" : "Gemini 2.5 Flash-Lite" 
+        model: model === "openai" ? "GPT-4o" : "Gemini 2.5 Flash" 
       });
     } catch (error) {
       console.error("Generation error:", error);
@@ -528,7 +528,7 @@ export async function registerRoutes(
 
       return res.json({ 
         tokens, 
-        model: model === "openai" ? "GPT-4o" : "Gemini 2.5 Flash-Lite" 
+        model: model === "openai" ? "GPT-4o" : "Gemini 2.5 Flash" 
       });
     } catch (error) {
       console.error("Regeneration error:", error);
